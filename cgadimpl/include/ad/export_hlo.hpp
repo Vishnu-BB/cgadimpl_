@@ -1,6 +1,3 @@
-// =============================================
-// cgadimpl/include/ad/export_hlo.hpp
-// =============================================
 #pragma once
 #include <string>
 #include "ad/graph.hpp"

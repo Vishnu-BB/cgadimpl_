@@ -1,6 +1,3 @@
-# ================================
-# kernels/CMakeLists.txt
-# ================================
 cmake_minimum_required(VERSION 3.20)
 project(agkernels LANGUAGES CXX)
 
@@ -10,4 +7,3 @@ if(NOT CGADIMPL_INCLUDE_DIR)
 endif()
 
 add_subdirectory(cpu)
-add_subdirectory(gpu)

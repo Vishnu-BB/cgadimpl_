@@ -1,6 +1,3 @@
-// =============================================
-// cgadimpl/include/ad/debug.hpp
-// =============================================
 #pragma once
 #include <memory>
 #include <string>
