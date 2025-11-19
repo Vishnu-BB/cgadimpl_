@@ -60,21 +60,31 @@ std::pair<int, int> Value::shape_2d() const {
 //     return Value(std::make_shared<Node>(v, Op::Leaf, name));
 // }
 
-// --- Graph Traversal ---
-std::vector<Node*> topo_from(Node* root){
+// --- Internal implementation for graph traversal ---
+static std::vector<Node*> build_topo_order_impl(Node* root) {
     std::vector<Node*> order; order.reserve(256);
     std::unordered_set<Node*> vis; vis.reserve(256);
     std::function<void(Node*)> dfs = [&](Node* n){ if(!n || vis.count(n)) return; vis.insert(n); for(auto& p : n->inputs) dfs(p.get()); order.push_back(n); };
     dfs(root);
-
-    // Print the contents of the vector before returning it
-    std::cout << "--- Topological Sort Result (inside topo_from) ---" << std::endl;
-    for (const auto* n : order) {
-        std::cout << "  Node @" << n << " (Op: " << op_name(n->op) << ", Name: " << n->debug_name << ")" << std::endl;
-    }
-    std::cout << "----------------------------------------------------" << std::endl;
-
     return order; // parents before child
+}
+
+// A cache for memoizing topological sorts of graphs.
+static std::unordered_map<Node*, std::vector<Node*>> topo_cache;
+
+// --- Graph Traversal ---
+std::vector<Node*> topo_from(Node* root){
+    // Check if the graph order is already cached
+    auto it = topo_cache.find(root);
+    if (it != topo_cache.end()) {
+        return it->second; // Cache hit
+    }
+
+    // Cache miss: build the order, cache it, and return it
+    std::cout << "--- Building and Caching Computational Graph ---" << std::endl;
+    std::vector<Node*> order = build_topo_order_impl(root);
+    topo_cache[root] = order;
+    return order;
 }
 
 } // namespace ag
