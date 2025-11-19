@@ -5,7 +5,7 @@
 #include <unordered_set>
 #include <functional>
 #include <cassert>
-
+#include <iostream> // Added for printing
 
 
 namespace ag {
@@ -66,6 +66,14 @@ std::vector<Node*> topo_from(Node* root){
     std::unordered_set<Node*> vis; vis.reserve(256);
     std::function<void(Node*)> dfs = [&](Node* n){ if(!n || vis.count(n)) return; vis.insert(n); for(auto& p : n->inputs) dfs(p.get()); order.push_back(n); };
     dfs(root);
+
+    // Print the contents of the vector before returning it
+    std::cout << "--- Topological Sort Result (inside topo_from) ---" << std::endl;
+    for (const auto* n : order) {
+        std::cout << "  Node @" << n << " (Op: " << op_name(n->op) << ", Name: " << n->debug_name << ")" << std::endl;
+    }
+    std::cout << "----------------------------------------------------" << std::endl;
+
     return order; // parents before child
 }
 
