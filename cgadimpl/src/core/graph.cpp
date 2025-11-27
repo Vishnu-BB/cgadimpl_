@@ -113,33 +113,35 @@ namespace ag::jit {
 // ===================================================================
 // JIT Compiler Signature (Rewritten for N-Dimensional Tensors)
 // ===================================================================
+struct TensorMetadata {
+    std::vector<int64_t> shape;
+    Dtype dtype;
+    DeviceIndex device;
+};
+
 struct Signature {
-    // --- CHANGE #1: Store the full, N-dimensional shape ---
-    // We now store a vector of vectors, where each inner vector is a full shape.
-    std::vector<std::vector<int64_t>> in_shapes;
-    std::vector<std::vector<int64_t>> param_shapes;
+    std::vector<TensorMetadata> in_meta;
+    std::vector<TensorMetadata> param_meta;
 
     bool matches(const std::vector<Tensor*>& inputs,
                  const std::vector<Tensor*>& params) const {
-        if (inputs.size() != in_shapes.size() || params.size() != param_shapes.size()) {
+        if (inputs.size() != in_meta.size() || params.size() != param_meta.size()) {
             return false;
         }
 
-        // --- CHANGE #2: Update the comparison logic ---
         for (size_t i = 0; i < inputs.size(); ++i) {
-            // Get the real shape (a vector of int64_t) from the new Tensor class.
-            const auto& s = inputs[i]->shape().dims;
-            
-            // The comparison now works correctly because both `s` and `in_shapes[i]`
-            // are of the same type: std::vector<int64_t>.
-            if (s != in_shapes[i]) {
+            if (inputs[i]->shape().dims != in_meta[i].shape ||
+                inputs[i]->dtype() != in_meta[i].dtype ||
+                inputs[i]->device().device != in_meta[i].device.device ||
+                inputs[i]->device().index != in_meta[i].device.index) {
                 return false;
             }
         }
         for (size_t i = 0; i < params.size(); ++i) {
-            // Do the same for params.
-            const auto& s = params[i]->shape().dims;
-            if (s != param_shapes[i]) {
+            if (params[i]->shape().dims != param_meta[i].shape ||
+                params[i]->dtype() != param_meta[i].dtype ||
+                params[i]->device().device != param_meta[i].device.device ||
+                params[i]->device().index != param_meta[i].device.index) {
                 return false;
             }
         }
@@ -157,8 +159,8 @@ using Arg = std::variant<ArgInput,ArgParam,ArgSlot,ArgLit>;
 struct Step {
     Op op;
     std::vector<Arg> args;
-    int out_slot{};                 // where to write result
-    std::vector<int64_t> out_shape{}; // rows,cols
+    int out_slot{};
+    TensorMetadata out_meta;
 };
 
 struct Plan {
@@ -167,6 +169,8 @@ struct Plan {
     int num_slots{0};
     int out_slot{-1};
 };
+
+
 
 struct Compiled::Impl {
     Plan plan;
@@ -255,7 +259,7 @@ struct Compiled::Impl {
         // This loop is now correct thanks to your previous fix.
         for (const Step& st : plan.steps) {
             if (st.out_slot >= 0) {
-                slots[st.out_slot] = Tensor(OwnTensor::Shape{st.out_shape}, false);
+                slots[st.out_slot] = Tensor(OwnTensor::Shape{st.out_meta.shape}, st.out_meta.dtype, st.out_meta.device, false);
             }
         }
 
@@ -297,16 +301,16 @@ Compiled compile(const Value& output,
     // Build plan
     Plan plan;
 
-    // --- CHANGE #1: Populate the Signature with the correct N-D shape vector ---
-    plan.sig.in_shapes.reserve(inputs.size());
+    // Populate the Signature with full metadata
+    plan.sig.in_meta.reserve(inputs.size());
     for (const auto& v: inputs) {
-        // v.val() is a Tensor. .shape() is its member function returning a vector.
-        plan.sig.in_shapes.push_back(v.shape()); 
+        plan.sig.in_meta.push_back({v.shape(), v.val().dtype(), v.val().device()});
     }
-    plan.sig.param_shapes.reserve(params.size());
+    plan.sig.param_meta.reserve(params.size());
     for (const auto& v: params) {
-        plan.sig.param_shapes.push_back(v.shape());
+        plan.sig.param_meta.push_back({v.shape(), v.val().dtype(), v.val().device()});
     }
+
 
     auto order = topo_from(output.node.get());
     std::unordered_map<Node*,int> slot_of;
@@ -319,8 +323,8 @@ Compiled compile(const Value& output,
         Step st;
         st.op = n->op;
 
-        // --- CHANGE #2: Populate the Step with the correct N-D shape vector ---
-        st.out_shape = n->shape(); // Use the new .shape() helper on the Node
+        // Populate the Step with full output metadata
+        st.out_meta = {n->shape(), n->value.dtype(), n->value.device()};
 
         st.out_slot = plan.num_slots++;
         slot_of[n] = st.out_slot;
@@ -398,49 +402,70 @@ Compiled compile(const Value& output,
     //     }
     //     std::cout <<"]\n";
     // }
-    for (size_t i = 0; i < plan.steps.size(); ++i) {
-        const auto& st = plan.steps[i];
-        std::cout << "Step " << i << ": slot[" << st.out_slot << "] = " << op_name(st.op) << "(";
- 
-        // Print arguments
-        for (size_t j = 0; j < st.args.size(); ++j) {
-            // Helper to print a shape vector like [8, 16]
-            auto print_shape_vec = [](const std::vector<int64_t>& shape) {
-                std::cout << "[";
-                for (size_t k = 0; k < shape.size(); ++k) {
-                    std::cout << shape[k] << (k == shape.size() - 1 ? "" : ", ");
-                }
-                std::cout << "]";
-            };
+        // Helper to print shape
+        auto print_shape_vec = [](const std::vector<int64_t>& shape) {
+            std::cout << "[";
+            for (size_t k = 0; k < shape.size(); ++k) {
+                std::cout << shape[k] << (k == shape.size() - 1 ? "" : ", ");
+            }
+            std::cout << "]";
+        };
 
-            std::visit([&](auto&& arg) {
-                using T = std::decay_t<decltype(arg)>;
-                if constexpr (std::is_same_v<T, ArgInput>) {
-                    print_shape_vec(plan.sig.in_shapes[arg.idx]);
-                } else if constexpr (std::is_same_v<T, ArgParam>) {
-                    print_shape_vec(plan.sig.param_shapes[arg.idx]);
-                } else if constexpr (std::is_same_v<T, ArgSlot>) {
-                    // Find the step that produced this slot to get its shape
-                    for (size_t prev_i = 0; prev_i < i; ++prev_i) {
-                        if (plan.steps[prev_i].out_slot == arg.slot) {
-                            print_shape_vec(plan.steps[prev_i].out_shape);
-                            break;
+        // Helper to print dtype
+        auto get_dtype_str = [](Dtype dt) -> std::string {
+            switch(dt) {
+                case Dtype::Float32: return "fp32";
+                case Dtype::Float16: return "fp16";
+                case Dtype::Bfloat16: return "bf16";
+                case Dtype::Int32: return "i32";
+                case Dtype::Int64: return "i64";
+                default: return "unknown";
+            }
+        };
+
+        for (size_t i = 0; i < plan.steps.size(); ++i) {
+            const auto& st = plan.steps[i];
+            std::cout << "Step " << i << ": slot[" << st.out_slot << "] = " << op_name(st.op) << "(";
+     
+            // Print arguments
+            for (size_t j = 0; j < st.args.size(); ++j) {
+                std::visit([&](auto&& arg) {
+                    using T = std::decay_t<decltype(arg)>;
+                    if constexpr (std::is_same_v<T, ArgInput>) {
+                        const auto& m = plan.sig.in_meta[arg.idx];
+                        std::cout << get_dtype_str(m.dtype);
+                        print_shape_vec(m.shape);
+                    } else if constexpr (std::is_same_v<T, ArgParam>) {
+                        const auto& m = plan.sig.param_meta[arg.idx];
+                        std::cout << get_dtype_str(m.dtype);
+                        print_shape_vec(m.shape);
+                    } else if constexpr (std::is_same_v<T, ArgSlot>) {
+                        // Find the step that produced this slot to get its shape
+                        bool found = false;
+                        for (size_t prev_i = 0; prev_i < i; ++prev_i) {
+                            if (plan.steps[prev_i].out_slot == arg.slot) {
+                                const auto& m = plan.steps[prev_i].out_meta;
+                                std::cout << get_dtype_str(m.dtype);
+                                print_shape_vec(m.shape);
+                                found = true;
+                                break;
+                            }
                         }
+                        if (!found) std::cout << "slot[" << arg.slot << "]";
+                    } else if constexpr (std::is_same_v<T, ArgLit>) {
+                        std::cout << get_dtype_str(arg.t.dtype());
+                        print_shape_vec(arg.t.shape().dims);
                     }
-                } else if constexpr (std::is_same_v<T, ArgLit>) {
-                    print_shape_vec(arg.t.shape().dims);
-                }
-            }, st.args[j]);
-
-            if (j < st.args.size() - 1) std::cout << ", ";
+                }, st.args[j]);
+    
+                if (j < st.args.size() - 1) std::cout << ", ";
+            }
+    
+            std::cout << ") -> shape ";
+            print_shape_vec(st.out_meta.shape);
+            
+            std::cout << " -> Device [" << (st.out_meta.device.is_cpu() ? "CPU" : "CUDA") << "]\n";
         }
-
-        std::cout << ") -> shape [";
-        for (size_t j = 0; j < st.out_shape.size(); ++j) {
-            std::cout << st.out_shape[j] << (j == st.out_shape.size() - 1 ? "" : ", ");
-        }
-        std::cout << "]\n";
-    }
     std::cout << "\\n";
     Compiled c;
     c.p = std::make_shared<Compiled::Impl>();
