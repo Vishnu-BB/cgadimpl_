@@ -345,7 +345,103 @@ Compiled compile(const Value& output,
 
     // Final slot
     plan.out_slot = slot_of.at(output.node.get());
+    // std::cout<<"\n-------JIT Execution Plan--------------\n";
 
+    // std::cout<<"signature:\n";
+    // for(size_t i=0; i < plan.sig.in_shapes.size(); ++i){
+    //     std::cout<<" Input " << i << " Shape: [";
+    //     for (size_t j = 0; j < plan.sig.in_shapes[i].size(); ++j){
+    //         std::cout<<plan.sig.in_shapes[i][j] << (j == plan.sig.in_shapes[i].size() - 1 ? "":", ");
+    //     }
+    //     std::cout << "]\n";
+    // }
+    // for (size_t i = 0; i < plan.sig.param_shapes.size(); ++i){
+    //     std::cout<<" Param " << i << " Shape: [";
+    //     for(size_t j = 0; j < plan.sig.param_shapes[i].size(); ++j){
+    //         std::cout<<plan.sig.param_shapes[i][j] << (j == plan.sig.param_shapes[i].size() - 1 ? "":", ");
+    //     }
+    //     std::cout <<"]\n";
+    // }
+    // std::cout<<"num slots:"<<plan.num_slots<<'\n';
+    // std::cout<<"out_slot"<<plan.out_slot<<'\n';
+
+// Compiled c = compile(output, inputs, params);
+//     const Plan& plan = c.p->plan; // Assuming c.p is a shared_ptr to Impl
+ 
+    // for (size_t i = 0; i < plan.steps.size(); ++i) {
+    // const Step& st = plan.steps[i];
+    // std::cout << "Step " << i << ": Op = " << op_name(st.op)
+    //           << ", OutSlot = " << st.out_slot
+    //           << ", OutShape = (" << st.out_shape[i] <<"\n";
+    // std::cout << "  Args: ";
+    // for (const auto& arg : st.args) {
+    //     if (std::holds_alternative<ArgInput>(arg))
+    //         std::cout << "[Input idx " << std::get<ArgInput>(arg).idx << "] ";
+    //     else if (std::holds_alternative<ArgParam>(arg))
+    //         std::cout << "[Param idx " << std::get<ArgParam>(arg).idx << "] ";
+    //     else if (std::holds_alternative<ArgSlot>(arg))
+    //         std::cout << "[Slot " << std::get<ArgSlot>(arg).slot << "] ";
+    //     else if (std::holds_alternative<ArgLit>(arg))
+    //         std::cout << "[Literal] ";
+    // }
+    // for(size_t i=0; i < plan.sig.in_shapes.size(); ++i){
+    //     std::cout<<" Input " << i << " Shape: [";
+    //     for (size_t j = 0; j < plan.sig.in_shapes[i].size(); ++j){
+    //         std::cout<<plan.sig.in_shapes[i][j] << (j == plan.sig.in_shapes[i].size() - 1 ? "":", ");
+    //     }
+    //     std::cout << "]\n";
+    // }
+    // for (size_t i = 0; i < plan.sig.param_shapes.size(); ++i){
+    //     std::cout<<" Param " << i << " Shape: [";
+    //     for(size_t j = 0; j < plan.sig.param_shapes[i].size(); ++j){
+    //         std::cout<<plan.sig.param_shapes[i][j] << (j == plan.sig.param_shapes[i].size() - 1 ? "":", ");
+    //     }
+    //     std::cout <<"]\n";
+    // }
+    for (size_t i = 0; i < plan.steps.size(); ++i) {
+        const auto& st = plan.steps[i];
+        std::cout << "Step " << i << ": slot[" << st.out_slot << "] = " << op_name(st.op) << "(";
+ 
+        // Print arguments
+        for (size_t j = 0; j < st.args.size(); ++j) {
+            // Helper to print a shape vector like [8, 16]
+            auto print_shape_vec = [](const std::vector<int64_t>& shape) {
+                std::cout << "[";
+                for (size_t k = 0; k < shape.size(); ++k) {
+                    std::cout << shape[k] << (k == shape.size() - 1 ? "" : ", ");
+                }
+                std::cout << "]";
+            };
+
+            std::visit([&](auto&& arg) {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, ArgInput>) {
+                    print_shape_vec(plan.sig.in_shapes[arg.idx]);
+                } else if constexpr (std::is_same_v<T, ArgParam>) {
+                    print_shape_vec(plan.sig.param_shapes[arg.idx]);
+                } else if constexpr (std::is_same_v<T, ArgSlot>) {
+                    // Find the step that produced this slot to get its shape
+                    for (size_t prev_i = 0; prev_i < i; ++prev_i) {
+                        if (plan.steps[prev_i].out_slot == arg.slot) {
+                            print_shape_vec(plan.steps[prev_i].out_shape);
+                            break;
+                        }
+                    }
+                } else if constexpr (std::is_same_v<T, ArgLit>) {
+                    print_shape_vec(arg.t.shape().dims);
+                }
+            }, st.args[j]);
+
+            if (j < st.args.size() - 1) std::cout << ", ";
+        }
+
+        std::cout << ") -> shape [";
+        for (size_t j = 0; j < st.out_shape.size(); ++j) {
+            std::cout << st.out_shape[j] << (j == st.out_shape.size() - 1 ? "" : ", ");
+        }
+        std::cout << "]\n";
+    }
+    std::cout << "\\n";
     Compiled c;
     c.p = std::make_shared<Compiled::Impl>();
     c.p->plan = std::move(plan);
