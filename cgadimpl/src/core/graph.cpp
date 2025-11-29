@@ -6,6 +6,7 @@
 #include <functional>
 #include <cassert>
 #include <iostream> // Added for printing
+#include <fstream>
 
 
 namespace ag {
@@ -74,13 +75,13 @@ static std::unordered_map<Node*, std::vector<Node*>> topo_cache;
 
 // --- Graph Traversal ---
 std::vector<Node*> topo_from(Node* root){
-    // Check if the graph order is already cached
+
     auto it = topo_cache.find(root);
     if (it != topo_cache.end()) {
         return it->second; // Cache hit
     }
 
-    // Cache miss: build the order, cache it, and return it
+
     std::cout << "--- Building and Caching Computational Graph ---" << std::endl;
     std::vector<Node*> order = build_topo_order_impl(root);
     topo_cache[root] = order;
@@ -88,31 +89,13 @@ std::vector<Node*> topo_from(Node* root){
 }
 
 } // namespace ag
-// ===================================================================
-// JIT COMPILER IMPLEMENTATION 
-//     Deleted broadcast_to and mul_scalar: These helper functions are no longer needed. The new OwnTensor library overloads operators like + and * to handle broadcasting automatically. This simplifies the code.
-//     Rewrote apply(): This is the most significant change.
-//         Binary Operators: Changed A + B to *a[0] + *a[1]. The OwnTensor operators will handle everything.
-//         Unary Operators: Changed Tensor::relu(*a[0]) to the free function OwnTensor::relu(*a[0]). This pattern must be applied to all unary functions.
-//         Missing Functions: I've commented out functions like softplus, silu, and softmax_row. The OwnTensor library, as provided, does not have these functions. To fully enable the JIT, you would need to either:
-//             Add these functions to the tensor library.
-//             Implement them manually inside the apply function using more basic ops (exp, log, /, etc.).
-//         Reductions: The reduction calls were updated to the new API, like OwnTensor::reduce_sum(*a[0]). For RowSum, we now call reduce_sum with the correct axis ({1}) and keepdim=true.
-//     Corrected run():
-//         The slots pre-allocation loop was already fixed by you in the previous step. It's correct.
-//         The tmp variable for literals needed to be initialized with the new default constructor pattern, which I've fixed.
-// Next Steps:
-//     Replace the entire Compiled::Impl struct in cgadimpl/src/graph.cpp with the rewritten version above.
-//     Decide what to do about the missing functions (like silu, softmax_row). For now, leaving them commented out is the safest option to get the code to compile.
-// ===================================================================  
+ 
 #include <unordered_map>
 #include <variant>
 #include <ad/runtime.hpp>
 
 namespace ag::jit {
-// ===================================================================
-// JIT Compiler Signature (Rewritten for N-Dimensional Tensors)
-// ===================================================================
+
 struct TensorMetadata {
     std::vector<int64_t> shape;
     Dtype dtype;
@@ -148,7 +131,7 @@ struct Signature {
         return true;
     }
 };
-// Arg sources for a Step
+
 struct ArgInput  { int idx; };   // external input[i]
 struct ArgParam  { int idx; };   // external param[i]
 struct ArgSlot   { int slot; };  // prior computed slot
@@ -175,7 +158,7 @@ struct Plan {
 struct Compiled::Impl {
     Plan plan;
 
-    // --- helpers for replay ---
+
     static const Tensor& as_ref(const Arg& a,
                                 const std::vector<Tensor*>& inputs,
                                 const std::vector<Tensor*>& params,
@@ -184,21 +167,19 @@ struct Compiled::Impl {
         if (std::holds_alternative<ArgInput>(a))  return *inputs[std::get<ArgInput>(a).idx];
         if (std::holds_alternative<ArgParam>(a))  return *params[std::get<ArgParam>(a).idx];
         if (std::holds_alternative<ArgSlot>(a))   return slots[std::get<ArgSlot>(a).slot];
-        // literal: copy into tmp to return a ref
+
         const Tensor& lit = std::get<ArgLit>(a).t;
         tmp = lit;
         return tmp;
     }
 
 
-    static Tensor apply(Op op, const std::vector<const Tensor*>& a) {
-        // a.size() equals op_arity(op), except literals we materialized as tensors
+    static Tensor apply(Op op, const std::vector<const Tensor*>& a) { // a.size() equals op_arity(op), except literals we materialized as tensors
         switch(op){
             case Op::Add:        return *a[0] + *a[1];
             case Op::Sub:        return *a[0] - *a[1];
             case Op::Mul:        return *a[0] * *a[1];
 
-            // Unary operators now use the free functions from the OwnTensor namespace.
             case Op::Transpose:  return a[0]->transpose(-2, -1);
             case Op::Relu:     { cudaStream_t stream = (cudaStream_t)ag::current_stream(); return (*a[0] + OwnTensor::abs(*a[0], stream)) * 0.5f;}
             case Op::Exp:        return OwnTensor::exp(*a[0]);
@@ -242,7 +223,7 @@ struct Compiled::Impl {
             //     return mul_scalar(s, invB);
             // }
             case Op::Leaf: default: {
-                // Shouldn't get called for Leaf
+
                 assert(false && "apply(): unexpected op");
                 return *a[0];
             }
@@ -256,7 +237,7 @@ struct Compiled::Impl {
 
         std::vector<Tensor> slots(plan.num_slots);
         
-        // This loop is now correct thanks to your previous fix.
+
         for (const Step& st : plan.steps) {
             if (st.out_slot >= 0) {
                 slots[st.out_slot] = Tensor(OwnTensor::Shape{st.out_meta.shape}, st.out_meta.dtype, st.out_meta.device, false);
@@ -267,7 +248,7 @@ struct Compiled::Impl {
         for (const Step& st : plan.steps) {
             std::vector<const Tensor*> args; args.reserve(st.args.size());
             
-            // Corrected default constructor for tmp
+
             Tensor tmp{OwnTensor::Shape{}, OwnTensor::TensorOptions{}}; 
             
             std::vector<Tensor> tmp_keep; tmp_keep.reserve(st.args.size());
@@ -276,7 +257,7 @@ struct Compiled::Impl {
                     tmp_keep.emplace_back(std::get<ArgLit>(a).t);
                     args.push_back(&tmp_keep.back());
                 } else {
-                    // as_ref is fine, no changes needed here.
+
                     args.push_back(&as_ref(a, inputs, params, slots, tmp));
                 }
             }
@@ -294,9 +275,8 @@ Compiled compile(const Value& output,
                  const std::vector<Value>& inputs,
                  const std::vector<Value>& params,
                  const CompileOptions&) {
-    // Map externals (no changes needed here)
+
     std::unordered_map<Node*,int> in_ix, par_ix;
-    // ...
 
     // Build plan
     Plan plan;
@@ -323,13 +303,13 @@ Compiled compile(const Value& output,
         Step st;
         st.op = n->op;
 
-        // Populate the Step with full output metadata
+        // Populate the Step with output metadata
         st.out_meta = {n->shape(), n->value.dtype(), n->value.device()};
 
         st.out_slot = plan.num_slots++;
         slot_of[n] = st.out_slot;
 
-        // ... (Gather args logic is correct and needs no changes) ...
+
          st.args.reserve(n->inputs.size());
         for (auto& pin : n->inputs) {
             Node* p = pin.get();
@@ -402,13 +382,14 @@ Compiled compile(const Value& output,
     //     }
     //     std::cout <<"]\n";
     // }
-        // Helper to print shape
-        auto print_shape_vec = [](const std::vector<int64_t>& shape) {
-            std::cout << "[";
+            std::ofstream MyFile("jit_plan.ir");
+
+        auto print_shape_vec = [](std::ostream& os, const std::vector<int64_t>& shape) {
+            os << "[";
             for (size_t k = 0; k < shape.size(); ++k) {
-                std::cout << shape[k] << (k == shape.size() - 1 ? "" : ", ");
+                os << shape[k] << (k == shape.size() - 1 ? "" : ", ");
             }
-            std::cout << "]";
+            os << "]";
         };
 
         // Helper to print dtype
@@ -423,49 +404,53 @@ Compiled compile(const Value& output,
             }
         };
 
+
+
         for (size_t i = 0; i < plan.steps.size(); ++i) {
             const auto& st = plan.steps[i];
-            std::cout << "Step " << i << ": slot[" << st.out_slot << "] = " << op_name(st.op) << "(";
-     
+            MyFile << "Step " << i << ": slot[" << st.out_slot << "] = " << op_name(st.op) << "(";
+
             // Print arguments
             for (size_t j = 0; j < st.args.size(); ++j) {
                 std::visit([&](auto&& arg) {
                     using T = std::decay_t<decltype(arg)>;
                     if constexpr (std::is_same_v<T, ArgInput>) {
                         const auto& m = plan.sig.in_meta[arg.idx];
-                        std::cout << get_dtype_str(m.dtype);
-                        print_shape_vec(m.shape);
+                        MyFile << get_dtype_str(m.dtype);
+                        print_shape_vec(MyFile, m.shape);
                     } else if constexpr (std::is_same_v<T, ArgParam>) {
                         const auto& m = plan.sig.param_meta[arg.idx];
-                        std::cout << get_dtype_str(m.dtype);
-                        print_shape_vec(m.shape);
+                        MyFile << get_dtype_str(m.dtype);
+                        print_shape_vec(MyFile, m.shape);
                     } else if constexpr (std::is_same_v<T, ArgSlot>) {
                         // Find the step that produced this slot to get its shape
                         bool found = false;
                         for (size_t prev_i = 0; prev_i < i; ++prev_i) {
                             if (plan.steps[prev_i].out_slot == arg.slot) {
                                 const auto& m = plan.steps[prev_i].out_meta;
-                                std::cout << get_dtype_str(m.dtype);
-                                print_shape_vec(m.shape);
+                                MyFile << get_dtype_str(m.dtype);
+                                print_shape_vec(MyFile, m.shape);
                                 found = true;
                                 break;
                             }
                         }
-                        if (!found) std::cout << "slot[" << arg.slot << "]";
+                        if (!found) MyFile << "slot[" << arg.slot << "]";
                     } else if constexpr (std::is_same_v<T, ArgLit>) {
-                        std::cout << get_dtype_str(arg.t.dtype());
-                        print_shape_vec(arg.t.shape().dims);
+                        MyFile << get_dtype_str(arg.t.dtype());
+                        print_shape_vec(MyFile, arg.t.shape().dims);
                     }
                 }, st.args[j]);
-    
-                if (j < st.args.size() - 1) std::cout << ", ";
+                if (j < st.args.size() - 1) MyFile << ", ";
             }
-    
-            std::cout << ") -> shape ";
-            print_shape_vec(st.out_meta.shape);
             
-            std::cout << " -> Device [" << (st.out_meta.device.is_cpu() ? "CPU" : "CUDA") << "]\n";
+            MyFile << ") -> shape ";
+            print_shape_vec(MyFile, st.out_meta.shape);
+            
+            MyFile << " -> Device [" << (st.out_meta.device.is_cpu() ? "CPU" : "CUDA") << "]\n";
         }
+
+    MyFile.close();
+
     std::cout << "\\n";
     Compiled c;
     c.p = std::make_shared<Compiled::Impl>();
