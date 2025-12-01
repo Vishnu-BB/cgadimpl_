@@ -999,6 +999,15 @@ void vjp_MAELoss(Node* n, const Tensor& gy){
     }
 }
 
+// ===================================================================
+// vjp_MambaSSM (Stub - needs proper implementation)
+// ===================================================================
+void vjp_MambaSSM(Node* n, const Tensor& gy){
+    // TODO: Implement proper gradient computation for MambaSSM
+    // For now, this is a stub to allow compilation
+    throw std::runtime_error("VJP for MambaSSM not implemented yet!");
+}
+
 void vjp_Leaf(Node*, const Tensor&){ /* no-op */ }
 
 } // namespace detail

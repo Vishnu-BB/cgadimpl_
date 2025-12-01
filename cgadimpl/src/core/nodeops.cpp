@@ -674,28 +674,9 @@ std::shared_ptr<Node> sigmoid_nodeops(const std::shared_ptr<Node>& x){
 // softplus_nodeops
 // ===================================================================
 std::shared_ptr<Node> softplus_nodeops(const std::shared_ptr<Node>& x){
-    // All ops automatically use the stream from the context.
-    const float threshold = 20.0f;
-    
-    const Tensor& x_val = x->value;
-    Tensor y = OwnTensor::Tensor::zeros(x_val.shape(), ag::options(x_val));
-    
-    // Dispatch by dtype to handle the computation
-    dispatch_by_dtype(x_val.dtype(), [&](auto dummy){
-        using T = decltype(dummy);
-        const T* x_data = x_val.data<T>();
-        T* y_data = y.data<T>();
-        int64_t n = x_val.numel();
-        
-        for (int64_t i = 0; i < n; ++i) {
-            T val = x_data[i];
-            if (val > T(threshold)) {
-                y_data[i] = val;  // For large x, softplus(x) ≈ x
-            } else {
-                y_data[i] = std::log(T(1.0) + std::exp(val));
-            }
-        }
-    });
+    // softplus(x) = log(1 + exp(x))
+    // This uses high-level OwnTensor ops which are device-agnostic (CPU/GPU) and stream-aware.
+    Tensor y = OwnTensor::log(1.0f + OwnTensor::exp(x->value));
 
     auto n = std::make_shared<Node>(y, Op::Softplus, x->requires_grad(), "softplus");
     n->inputs = {x};
@@ -876,7 +857,6 @@ std::shared_ptr<Node> rms_nodeops(const std::shared_ptr<Node>& x){
     // --- FIX START ---
     // The backward pass needs rsqrt_var and the normalized output 'y'.
     n->tape.push_back(std::make_shared<Tensor>(rsqrt_var));
-    n->tape.push_back(std::make_shared<Tensor>(x->value)); // Incorrectly saving original x
     n->tape.push_back(std::make_shared<Tensor>(y));         // Correctly save the normalized output y
     // --- FIX END ---
     n->inputs = {x};
@@ -1078,9 +1058,8 @@ std::shared_ptr<Node> mambassm_nodeops(const std::shared_ptr<Node>& z, const std
         // Create a new leaf node for the initial state 'w'. It is not a parameter.
         auto W = std::make_shared<Node>(w, Op::Leaf, "ssm_state");
         
-        // The Op was wrong here, let's assume it should be a custom 'MambaSSM' Op
-        // Use a generic but existing Op as a placeholder. The final operation is an addition.
-        auto n = std::make_shared<Node>(y, Op::Add, "mambassm");
+        // Use the correct MambaSSM Op.
+        auto n = std::make_shared<Node>(y, Op::MambaSSM, "mambassm");
         
         // The inputs to this step are the original inputs plus the NEW state node.
         n->inputs = {z, a, b, c, d, W}; 
@@ -1104,8 +1083,8 @@ std::shared_ptr<Node> mambassm_nodeops(const std::shared_ptr<Node>& z, const std
         // Create a new leaf node for the CURRENT state 'w'.
         auto W = std::make_shared<Node>(w, Op::Leaf, "ssm_state");
         
-        // Use a generic but existing Op as a placeholder. The final operation is an addition.
-        auto n = std::make_shared<Node>(y, Op::Add, "mambassm");
+        // Use the correct MambaSSM Op.
+        auto n = std::make_shared<Node>(y, Op::MambaSSM, "mambassm");
         n->inputs = {z, a, b, c, d, W}; 
         
         // Update the tape of the input 'z' with the new state for the next step.

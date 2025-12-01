@@ -31,7 +31,6 @@ struct Node : std::enable_shared_from_this<Node> {
     const char* debug_name{""};
     Op op{Op::Leaf};
     bool requires_grad_flag_{false};
-    bool is_checkpoint{false};
     bool has_saved_rng{false};
     bool requires_grad() const { return requires_grad_flag_; }
     const std::vector<int64_t>& shape() const { return value.shape().dims; }

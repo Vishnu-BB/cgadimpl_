@@ -563,6 +563,11 @@ Tensor jvp_KLDivergence(Node* n, const std::function<const Tensor&(Node*)>& t){
     throw std::runtime_error("JVP for KLDivergence not implemented yet!");
 }
 
+Tensor jvp_MambaSSM(Node* n, const std::function<const Tensor&(Node*)>& t){
+    // TODO: Implement proper JVP for MambaSSM
+    throw std::runtime_error("JVP for MambaSSM not implemented yet!");
+}
+
 Tensor jvp_Leaf(Node*, const std::function<const Tensor&(Node*)>&){
     return Tensor(Shape{}, TensorOptions{}); // unused
 }

@@ -280,9 +280,10 @@ Compiled compile(const Value& output,
                  const std::vector<Value>& inputs,
                  const std::vector<Value>& params,
                  const CompileOptions&) {
-    // Map externals (no changes needed here)
+    // Map externals
     std::unordered_map<Node*,int> in_ix, par_ix;
-    // ...
+    for(size_t i=0; i<inputs.size(); ++i) in_ix[inputs[i].node.get()] = i;
+    for(size_t i=0; i<params.size(); ++i) par_ix[params[i].node.get()] = i;
 
     // Build plan
     Plan plan;

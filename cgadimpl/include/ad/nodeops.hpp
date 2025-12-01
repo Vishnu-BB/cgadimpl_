@@ -4,7 +4,6 @@
 #pragma once
 
 #include "ad/graph.hpp"
-#include "ad/checkpoint.hpp"
 #include "ad/kernels_api.hpp"
 #include "ad/debug.hpp"
 
@@ -26,7 +25,6 @@ namespace detail {
     // --- Node-Level Operations (Internal API) ---
     // These functions perform the core graph manipulation and tensor computations.
 
-//std::shared_ptr<Node> checkpoint_nodeops(const std::shared_ptr<Node> &v, const CheckpointOptions &opts);
 
 std::shared_ptr<Node> add_nodeops(const std::shared_ptr<Node>& a, const std::shared_ptr<Node>& b);
 std::shared_ptr<Node> sub_nodeops(const std::shared_ptr<Node>& a, const std::shared_ptr<Node>& b);
