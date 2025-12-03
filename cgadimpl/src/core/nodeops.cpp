@@ -18,6 +18,7 @@ std::shared_ptr<Node> add_nodeops(const std::shared_ptr<Node>& a, const std::sha
     Tensor Y = a->value + b->value; 
     // FIX: Use the new 3-argument Node constructor
     auto n = std::make_shared<Node>(Y, Op::Add, (a->requires_grad() || b->requires_grad()), "+");
+    // 3. Link the new node to its parents (`a` and `b`) to form the graph.
     n->inputs = {a, b};
     ag::debug::on_node_created(n);
     return n;
@@ -247,7 +248,7 @@ std::shared_ptr<Node> reluatt_nodeops(const std::shared_ptr<Node>& a,
 
     // --- Step 5: Create the graph node ---
     // This part is correct.
-    auto n = std::make_shared<Node>(y, Op::RELUAtt, (a->requires_grad() || b->requires_grad() || c->requires_grad() || d->requires_grad()), "reluatt"); 
+    auto n = std::make_shared<Node>(y, Op::Attention, (a->requires_grad() || b->requires_grad() || c->requires_grad() || d->requires_grad()), "reluatt"); 
     n->inputs = {a, b, c, d};
     n->tape.push_back(std::make_shared<Tensor>(q));
     n->tape.push_back(std::make_shared<Tensor>(k));
