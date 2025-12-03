@@ -1192,41 +1192,5 @@ std::shared_ptr<Node> mae_loss_nodeops(const std::shared_ptr<Node>& pred, const 
     return n;
 }
 
-    // Tensor forward_eval_node_impl(const std::shared_ptr<Node>& node) {
-    //     if (!node) throw std::runtime_error("forward_eval_node: null node");
-    //     switch (node->op) {
-    //         case Op::Add: return node->inputs[0]->value + node->inputs[1]->value;
-    //         case Op::Sub: return node->inputs[0]->value - node->inputs[1]->value;
-    //         case Op::Mul: return node->inputs[0]->value * node->inputs[1]->value;
-    //         case Op::MatMul: return Tensor::matmul(node->inputs[0]->value, node->inputs[1]->value);
-    //         case Op::Relu: return Tensor::relu(node->inputs[0]->value);
-    //         case Op::Sigmoid: return Tensor::sigmoid(node->inputs[0]->value);
-    //         case Op::Tanh: return Tensor::tanh(node->inputs[0]->value);
-    //         case Op::Exp: return Tensor::exp(node->inputs[0]->value);
-    //         case Op::Log: return Tensor::log(node->inputs[0]->value);
-    //         case Op::AlibiAttention: {
-    //             const Tensor &a = node->inputs[0]->value;
-    //             const Tensor &b = node->inputs[1]->value;
-    //             const Tensor &c = node->inputs[2]->value;
-    //             const Tensor &d = node->inputs[3]->value;
-    //             Tensor q = Tensor::matmul(a, b);
-    //             Tensor k = Tensor::matmul(a, c);
-    //             Tensor v = Tensor::matmul(a, d);
-    //             Tensor logits = Tensor::matmul(q, Tensor::transpose(k) * (1.f / sqrt(float(k.cols()))));
-    //             Tensor bias   = Tensor::alibi(logits.rows(), logits.cols(), /*m*/128);
-    //             Tensor g      = logits + bias;
-    //             Tensor s      = Tensor::softmax_row(g);
-    //             return Tensor::matmul(s, v);
-    //         }
-    //         case Op::Leaf:
-    //             return node->value;
-    //         default:
-    //             if (!node->tape.empty()) {
-    //                 return *(node->tape.back());
-    //             }
-    //             throw std::runtime_error("forward_eval_node: unsupported op for recompute");
-    //     }
-    // }
-
     } // namespace detail
     } // namespace ag
