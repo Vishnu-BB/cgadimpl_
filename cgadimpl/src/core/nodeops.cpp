@@ -449,7 +449,7 @@ std::shared_ptr<Node> linear_nodeops(const std::shared_ptr<Node>& a, // Input X
 // sin_nodeops
 // ===================================================================
 
-     std::shared_ptr<Node> sin_nodeops(const std::shared_ptr<Node>& x){
+    std::shared_ptr<Node> sin_nodeops(const std::shared_ptr<Node>& x){
         Tensor y = sin(x->value);
         auto n=std::make_shared<Node>(y, Op::Sin, x->requires_grad(), "sinh");
         n->inputs={x};
@@ -457,6 +457,47 @@ std::shared_ptr<Node> linear_nodeops(const std::shared_ptr<Node>& a, // Input X
         return n;
     }
 
+// ===================================================================
+// sin_nodeops
+// ===================================================================
+
+    std::shared_ptr<Node> asin_nodeops(const std::shared_ptr<Node>& x){
+        Tensor y = sin(x->value);
+        auto n=std::make_shared<Node>(y, Op::Asin, x->requires_grad(), "asin");
+        n->inputs={x};
+        ag::debug::on_node_created(n);
+        return n;
+    }
+// ===================================================================
+// sin_nodeops
+// ===================================================================
+
+    std::shared_ptr<Node> acos_nodeops(const std::shared_ptr<Node>& x){
+        Tensor y = sin(x->value);
+        auto n=std::make_shared<Node>(y, Op::Acos, x->requires_grad(), "acos");
+        n->inputs={x};
+        ag::debug::on_node_created(n);
+        return n;
+    }
+// ===================================================================
+// sin_nodeops
+// ===================================================================
+
+    std::shared_ptr<Node> atan_nodeops(const std::shared_ptr<Node>& x){
+        Tensor y = sin(x->value);
+        auto n=std::make_shared<Node>(y, Op::Atan, x->requires_grad(), "atan");
+        n->inputs={x};
+        ag::debug::on_node_created(n);
+        return n;
+    }
+
+        std::shared_ptr<Node> tan_nodeops(const std::shared_ptr<Node>& x){
+        Tensor y = sin(x->value);
+        auto n=std::make_shared<Node>(y, Op::Tan, x->requires_grad(), "tan");
+        n->inputs={x};
+        ag::debug::on_node_created(n);
+        return n;
+    }
 // ===================================================================
 // In file: cgadimpl/src/nodeops.cpp (Corrected sign_nodeops)
 // ===================================================================

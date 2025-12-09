@@ -63,6 +63,11 @@ Value mambassm(const Value& z, const Value& a, const Value& b, const Value& c, c
 Value sign (const Value& a, const Value& b);
 Value moewe(const Value& x, const Value& w, const Value& b);
 
+Value tan(const Value& x);
+Value atan(const Value& x);
+Value asin(const Value& x);
+Value acos(const Value& x);
+
 // rowwise reductions / softmax family
 Value rowsum (const Value& x); // [B,C] -> [B,1]
 Value rowmax (const Value& x); // [B,C] -> [B,1]

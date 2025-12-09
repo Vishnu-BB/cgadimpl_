@@ -64,6 +64,11 @@ std::shared_ptr<Node> softplus_nodeops(const std::shared_ptr<Node>& x);
 std::shared_ptr<Node> relumask_nodeops(const std::shared_ptr<Node>& x);
 std::shared_ptr<Node> cosh_nodeops(const std::shared_ptr<Node>& x);
 std::shared_ptr<Node> sinh_nodeops(const std::shared_ptr<Node>& x);
+std::shared_ptr<Node> atan_nodeops(const std::shared_ptr<Node>& x);
+
+std::shared_ptr<Node> asin_nodeops(const std::shared_ptr<Node>& x);
+std::shared_ptr<Node> acos_nodeops(const std::shared_ptr<Node>& x);
+std::shared_ptr<Node> tan_nodeops(const std::shared_ptr<Node>& x);
 std::shared_ptr<Node> cos_nodeops(const std::shared_ptr<Node>& x);
 std::shared_ptr<Node> sin_nodeops(const std::shared_ptr<Node>& x);
 std::shared_ptr<Node> sqrt_nodeops(const std::shared_ptr<Node>& x);
