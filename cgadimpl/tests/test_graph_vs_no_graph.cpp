@@ -2,6 +2,13 @@
 #include <random>
 #include <iomanip>
 #include "ad/ag_all.hpp" // Main umbrella header
+#include <time.h>
+#include <iostream>
+#include <iomanip>
+// #include "stdafx.h"
+#include <chrono>
+using namespace std;
+using namespace std::chrono;
 
 using namespace ag;
 
@@ -21,7 +28,7 @@ int main() {
     // ---------- Data ----------
     // Inputs are constants (requires_grad=false, which is the default)
     Tensor Xt = Tensor::randn(Shape{{B, In}}, TensorOptions());
-    Value X  = make_tensor(Xt, "X");
+    Value  X  = make_tensor(Tensor::randn(Shape{{B, In}}, TensorOptions()), "X");
 
     // One-hot labels Y[B,Out]
     Tensor Yt(Shape{{B, Out}}, TensorOptions());
@@ -49,7 +56,8 @@ int main() {
     auto b4 = make_tensor(Tensor::zeros(Shape{{1, H4}}, opts_param), "b4");
     auto W5 = make_tensor(Tensor::randn(Shape{{H4, Out}}, opts_param), "W5");
     auto b5 = make_tensor(Tensor::zeros(Shape{{1, Out}}, opts_param), "b5");
-    
+
+    auto start = high_resolution_clock::now();
     // ---------- Forward: 4 hidden layers + logits ----------
     Value L1 = gelu(matmul(X,  W1) + b1);
     Value L2 = silu(matmul(L1, W2) + b2);
@@ -58,21 +66,25 @@ int main() {
     Value logits = matmul(L4, W5) + b5;
     Value loss = cross_entropy_with_logits(logits, Y);
 
-    // ---------- Backprop ----------
-    zero_grad(loss);
-    backward(loss);
-        // Tell the compiler which leaves are runtime inputs vs. trainable parameters
     std::vector<Value> inputs = {X};
     std::vector<Value> params = {W1, b1, W2,b2,W3,b3,W4,b4,W5,b5};
 
     // The 'loss' Value is the root of the graph to be compiled
     auto comp = ag::jit::compile(loss, inputs, params);
+
+    // ---------- Backprop ----------
+    zero_grad(loss);
+    backward(loss);
+
+    auto end = high_resolution_clock::now();
+        // Tell the compiler which leaves are runtime inputs vs. trainable parameters
     
+    auto duration = duration_cast<microseconds>(end - start);
     // Use the framework's debug utilities
     // ag::debug::print_all_grads(loss);
     // ag::debug::dump_dot(loss, "build/graph.dot");
     // ag::debug::dump_vjp_dot(loss, "build/graph_vjp.dot");
-
+    std::cout << "Time taken by insertion sort: " << duration.count() << " microseconds" << std::endl;
     // ---------- Report ----------
     // To get a scalar value, move to CPU and get the data pointer
     float loss_val = loss.val().to_cpu().data<float>()[0];
@@ -102,40 +114,3 @@ int main() {
 
     return 0;
 }
-
-
-// #include <time.h>
-// #include <iostream>
-// #include <iomanip>
-// // #include "stdafx.h"
-// #include <chrono>
-// using namespace std;
-// using namespace std::chrono;
-// using namespace ag;
-
-// int main(){
-//     std::cout << std::fixed << std::setprecision(4);
-//     // time.start();
-//     auto start = high_resolution_clock::now();
-//     const int B = 1000;     // batch size
-//     const int In = 1000;
-//     const int H1 = 1000;
-
-//     Tensor Xt = Tensor::randn(Shape{{B, In}}, TensorOptions());
-//     Value  X  = make_tensor(Tensor::randn(Shape{{B, In}}, TensorOptions()), "X");
-
-//     auto opts_param = TensorOptions().with_req_grad(true);
-//     auto W1 = make_tensor(Tensor::randn(Shape{{In, H1}}, opts_param), "W1");
-//     Value L1 = matmul(X,  W1);
-//     // time.end();
-//     auto stop = high_resolution_clock::now();
-//     std::vector<Value> inputs = {X};
-//     std::vector<Value> params = {W1};
-//     // std::cout<<time.start()-time.end()<<std::endl;
-//     auto duration = duration_cast<microseconds>(stop - start);
-
-//     std::cout << "Time taken by insertion sort: " << duration.count() << " microseconds" << std::endl;
-
-//     auto comp = ag::jit::compile(L1, inputs, params);
-//     debug::print_value("L1", L1);
-// }
