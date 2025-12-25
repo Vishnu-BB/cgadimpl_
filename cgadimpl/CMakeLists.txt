@@ -89,6 +89,7 @@ if(true)
   add_ag_test(test_graph_vs_no_graph                    tests/test_graph_vs_no_graph.cpp)  #this works
   add_ag_test(test_scheme                    tests/test_scheme.cpp)
   add_ag_test(performance_test               tests/performance_test.cpp)
+  add_ag_test(test_graph_edge_cases          tests/test_graph_edge_cases.cpp)
   # add_ag_test(test_arena                     tests/test_arena.cpp)
 endif()
 
