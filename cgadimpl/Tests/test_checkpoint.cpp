@@ -106,7 +106,7 @@ struct DeepModel {
     int hidden_dim;
     
     DeepModel(int d, int h) : depth(d), hidden_dim(h) {
-        auto opts = TensorOptions().with_req_grad(true);
+        auto opts = TensorOptions().with_dtype(Dtype::Float32).with_req_grad(true); 
         for (int i = 0; i < depth; ++i) {
             weights.push_back(make_tensor(Tensor::randn(Shape{{h, h}}, opts), ("w" + std::to_string(i)).c_str()));
             biases.push_back(make_tensor(Tensor::randn(Shape{{1, h}}, opts), ("b" + std::to_string(i)).c_str()));
@@ -154,8 +154,8 @@ void run_memory_savings_test() {
     std::cout << "  - Batch Size: " << batch_size << "\n\n";
     
     DeepModel model(depth, hidden_dim);
-    Value input = make_tensor(Tensor::randn(Shape{{batch_size, hidden_dim}}, TensorOptions()), "input");
-    
+    Value input = make_tensor(Tensor::randn(Shape{{batch_size, hidden_dim}}, 
+                          TensorOptions().with_dtype(Dtype::Float32)), "input");    
     // ------------------------------------------------------------------------
     // Scenario 1: Standard Training (No Checkpointing)
     // ------------------------------------------------------------------------

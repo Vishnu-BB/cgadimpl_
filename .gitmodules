@@ -1,6 +1,12 @@
 [submodule "tensor"]
 	path = tensor
+<<<<<<< Updated upstream
 	url = https://github.com/kathir-23s/Tensor-Implementations
 [submodule "NovaCompiler"]
 	path = NovaCompiler
+=======
+	url = https://github.com/kathir-23s/Tensor-Implementations.git
+[submodule "Nova-Compiler"]
+	path = Nova-Compiler
+>>>>>>> Stashed changes
 	url = https://github.com/AdwaidSuresh123/Nova-Compiler.git
