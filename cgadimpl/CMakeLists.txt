@@ -65,6 +65,7 @@ target_include_directories(cgadimpl PRIVATE /usr/local/cuda/include)
 # target_link_libraries(cgadimpl PUBLIC OwnTensor::tensor dl)
 target_compile_definitions(cgadimpl PUBLIC WITH_CUDA)
 target_include_directories(cgadimpl PUBLIC 
+    ${NOVA_INCLUDE_DIRS}
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     ${LLVM_INCLUDE_DIRS}
     ${MLIR_INCLUDE_DIRS}
@@ -138,6 +139,7 @@ if(true)
   add_ag_test(test_graph_compile                    Tests/test_graph_compile.cpp)
   add_ag_test(ag_core_test                    Tests/test.cpp)
   add_ag_test(test_checkpoint                    Tests/test_checkpoint.cpp)
+  add_ag_test(test_mlp_checkpoint_improved       Tests/test_mlp_checkpoint_improved.cpp)
   add_ag_test(test_inplace                    Tests/test_inplace.cpp)
   # add_ag_test(test_careful_deletion                    Tests/test_careful_deletion.cpp)
   add_ag_test(test_nn                    Tests/test_nn.cpp)

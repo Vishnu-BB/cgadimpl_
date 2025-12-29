@@ -377,10 +377,11 @@ Tensor forward_eval_node(const std::shared_ptr<Node> &node) {
             // This logic MUST match the forward logic in linear_nodeops
             return matmul(input_X, weight_W.t()) + bias_b;
         }
-        // case Op::Sigmoid: {
-        //     const Tensor &X = node->inputs[0]->value;
-        // //     return Tensor::sigmoid(X);
-        // }
+        case Op::Sigmoid: {
+            const Tensor &X = node->inputs[0]->value;
+            Tensor y = 1.0f / (1.0f + OwnTensor::exp(X * -1.0f));
+            return y;
+        }
         case Op::Tanh: {
             const Tensor &X = node->inputs[0]->value;
             return tanh(X);
@@ -389,9 +390,23 @@ Tensor forward_eval_node(const std::shared_ptr<Node> &node) {
             const Tensor &X = node->inputs[0]->value;
             return exp(X);
         }
+        case Op::GELU: {
+            const Tensor &x = node->inputs[0]->value;
+            // GELU(x) = 0.5 * x * (1 + tanh(sqrt(2/pi) * (x + 0.044715 * x^3)))
+            float k = std::sqrt(2.0f / 3.14159265358979323846f);
+            auto x3 = OwnTensor::pow(x, 3.0f, ag::current_stream());
+            auto inner = (x + x3 * 0.044715f) * k;
+            auto tanh_inner = OwnTensor::tanh(inner, ag::current_stream());
+            return x * 0.5f * (tanh_inner + 1.0f);
+        }
         case Op::Log: {
             const Tensor &X = node->inputs[0]->value;
             return log(X);
+        }
+        case Op::Softplus:{
+            const Tensor &x = node->inputs[0]->value;
+            Tensor y = OwnTensor::log(1.0f + OwnTensor::exp(x));
+            return y;
         }
         
 

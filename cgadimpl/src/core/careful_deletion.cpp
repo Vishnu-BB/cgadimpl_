@@ -142,20 +142,28 @@ static bool gradients_done(Node* n) {
  *      - Aggressive deletion optionally erases in-place metadata via
  *        `inplace::detail::erase_snapshot(node)` to free alias info too.
  */
-bool try_delete_node(Node* node, DeletePolicy policy) {
+bool try_delete_node(Node* node, DeletePolicy policy, const std::unordered_set<Node*>* protected_nodes) {
     if (!node) return false;
+
+    // 0 Check if node is explicitly protected
+    if (protected_nodes && protected_nodes->count(node)) return false;
 
     // 1 Skip parameter or constant leaf nodes (never delete their tensors)
     if (node->op == Op::Leaf) return false;
 
     // 2  Skip checkpoint nodes — these must remain for recomputation
+    //    (Unless we are in a very specific advanced mode, but generally checkpoints are anchors)
     if (node->is_checkpoint) return false;
 
     // 3  Skip nodes with active alias relationships
     if (has_active_alias(node)) return false;
 
-    // 4  Skip if gradients are still required by parent nodes
-    if (!gradients_done(node)) return false;
+    // 4  Check gradient dependencies
+    //    If policy is ForwardPass, we ALLOW deleting nodes even if gradients are needed,
+    //    because we assume we can recompute them.
+    if (policy != DeletePolicy::ForwardPass) {
+        if (!gradients_done(node)) return false;
+    }
 
     // 5 Otherwise, it is safe to free this node’s memory
     // node->value = Tensor(OwnTensor::Shape{}, ag::options(node->value)); // release the tensor’s data buffer
@@ -171,10 +179,10 @@ bool try_delete_node(Node* node, DeletePolicy policy) {
     }
 
     // Debug message — logs every node freed
-    std::cout << "[careful_delete] Freed node@" << node
-              << " op=" << op_name(node->op)
-              << " policy=" << (policy == DeletePolicy::AlwaysSafe ? "Safe" : "Aggressive")
-              << "\n";
+    // std::cout << "[careful_delete] Freed node@" << node
+    //           << " op=" << op_name(node->op)
+    //           << " policy=" << (policy == DeletePolicy::AlwaysSafe ? "Safe" : "Aggressive")
+    //           << "\n";
     return true;
 }
 
@@ -205,11 +213,11 @@ bool try_delete_node(Node* node, DeletePolicy policy) {
  *      after backward():
  *          memory::sweep_safe_nodes(output, memory::DeletePolicy::AlwaysSafe);
  */
-void sweep_safe_nodes(const Value& root, DeletePolicy policy) {
+void sweep_safe_nodes(const Value& root, DeletePolicy policy, const std::unordered_set<Node*>& protected_nodes) {
     auto order = topo_from(root.node.get()); // Get nodes in topological order
     int freed = 0;
     for (Node* n : order) {
-        if (try_delete_node(n, policy))
+        if (try_delete_node(n, policy, &protected_nodes))
             ++freed;
     }
     std::cout << "[careful_delete] Sweep complete. Freed " << freed << " nodes.\n";

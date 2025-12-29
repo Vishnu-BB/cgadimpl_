@@ -150,9 +150,26 @@ void dump_dot(const Value& root, const std::string& filepath){
      for (Node* n : order) {
         std::ostringstream id; id << "n" << n;
         std::ostringstream lab;
-        lab  << op_name(n->op) << "\\n" << shape_str(n->value) << "\\n"<< dtype_str(n->value) ; // Correct
-        std::string color = (n->op==Op::Leaf ? (n->requires_grad() ? "lightgoldenrod1" : "lightgrey")
-                                             : (n->requires_grad() ? "lightblue" : "white")); // Correct
+        
+        // Check for deleted value
+        std::string val_str = shape_str(n->value);
+        // Check allocated_bytes to detect deleted tensors (which might appear as scalars)
+        if ((n->value.numel() == 0 || n->value.allocated_bytes() == 0) && n->op != Op::Leaf) {
+            val_str = "<deleted>";
+        }
+        
+        lab  << op_name(n->op) << "\\n" << val_str << "\\n"<< dtype_str(n->value) ; 
+        
+        std::string color;
+        if (n->is_checkpoint) {
+            color = "cornflowerblue"; // Highlight checkpoints
+            lab << "\\n(checkpoint)";
+        } else if (n->op == Op::Leaf) {
+            color = n->requires_grad() ? "lightgoldenrod1" : "lightgrey";
+        } else {
+            color = n->requires_grad() ? "lightblue" : "white";
+        }
+        
         out << "  " << id.str()
             << " [label=\"" << lab.str() << "\", style=filled, fillcolor=\""
             << color << "\"];\n";

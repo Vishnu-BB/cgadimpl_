@@ -84,6 +84,11 @@ void backward(const Value& root, const Tensor* grad_seed, bool enable_parallel){
                     throw std::runtime_error("autodiff: failed to recompute checkpointed node during backward");
                 }
             }
+
+            // Ensure inputs are present for VJP (critical for true gradient checkpointing)
+            if (!ag::checkpoint_impl::ensure_inputs_present(n->shared_from_this())) {
+                throw std::runtime_error("autodiff: failed to restore inputs for node during backward");
+            }
             
             VjpFn fn = vjp_lookup(n->op);
             if (fn) fn(n, gy);
@@ -118,6 +123,12 @@ void backward(const Value& root, const Tensor* grad_seed, bool enable_parallel){
                     pending_tasks--;
                     continue;
                 }
+            }
+
+            // Ensure inputs are present for VJP
+            if (!ag::checkpoint_impl::ensure_inputs_present(node->shared_from_this())) {
+                pending_tasks--;
+                continue;
             }
             
             // Execute VJP function

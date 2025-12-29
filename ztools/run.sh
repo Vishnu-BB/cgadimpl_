@@ -32,7 +32,7 @@ cd "${ROOT}"
 
 # --- STEP 2: Configure and build the core cgadimpl library ---
 echo "== Configuring core"
-cmake -S "$CGADIMPL_DIR" -B "$CGADIMPL_BUILD" -DCMAKE_BUILD_TYPE="$BUILD_TYPE"
+cmake -S "$CGADIMPL_DIR" -B "$CGADIMPL_BUILD" -DCMAKE_BUILD_TYPE="$BUILD_TYPE" -Dmlir-compiler_DIR="$ROOT/Nova-Compiler/build"
 
 echo "== Building core"
 cmake --build "$CGADIMPL_BUILD" -- -j$(nproc)
