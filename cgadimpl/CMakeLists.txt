@@ -12,6 +12,9 @@ set(CMAKE_CUDA_ARCHITECTURES 86 CACHE STRING "CUDA SMs" FORCE)
 
 project(cgadimpl LANGUAGES CXX CUDA)
 
+# --- Path Setup ---
+set(CMAKE_PREFIX_PATH "/home/blubridge-037/libtorch" "/tmp/libtorch" "${CMAKE_SOURCE_DIR}/../Nova-Compiler/build")
+
 # --- Compiler, CUDA, and OpenMP Setup ---
 find_package(CUDAToolkit REQUIRED)
 find_package(OpenMP REQUIRED)
@@ -19,6 +22,19 @@ find_package(OpenMP REQUIRED)
 # --- MLIR Setup ---
 find_package(MLIR REQUIRED CONFIG)
 find_package(mlir-compiler REQUIRED CONFIG)
+message(STATUS "mlir-compiler_FOUND: ${mlir-compiler_FOUND}")
+message(STATUS "mlir-compiler_DIR: ${mlir-compiler_DIR}")
+
+# --- LibTorch Setup (Optional - for comparison tests) ---
+find_package(Torch QUIET)
+if(Torch_FOUND)
+    message(STATUS "Found LibTorch: ${TORCH_INSTALL_PREFIX}")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
+else()
+    message(STATUS "LibTorch not found - skipping libtorch comparison test")
+endif()
+
+
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -158,6 +174,7 @@ if(true)
   add_ag_test(test_phase1_advanced            Tests/test_phase1_advanced.cpp)  # Phase 1 advanced edge cases
   add_ag_test(test_dependency_counter                         Tests/test_dependency_counter.cpp )
   add_ag_test(test_dependncy_counter2                        Tests/test_dependncy_counter2.cpp)
+  add_ag_test(test_nan_isolation                        Tests/test_nan_isolation.cpp)
   
   # Comprehensive dependency counter test suite
   add_ag_test(test_dependency_diamond            Tests/test_dependency_diamond.cpp)
@@ -170,6 +187,22 @@ if(true)
   add_ag_test(time_estimation                   Tests/test_time_execution.cpp)
   add_ag_test(test_dag_analysis                Tests/test_dag_analysis.cpp)
   add_ag_test(test_warmup                      Tests/test_warmup.cpp)
+  add_ag_test(test_checkpoint_comparison       Tests/test_checkpoint_comparison.cpp)
+  
+  # LibTorch comparison test (optional - only if Torch is found)
+  if(Torch_FOUND)
+    add_executable(test_libtorch_comparison Tests/test_libtorch_comparison.cpp)
+    target_link_libraries(test_libtorch_comparison PRIVATE 
+        cgadimpl::cgadimpl 
+        ${TORCH_LIBRARIES}
+        CUDA::cudart 
+        OpenMP::OpenMP_CXX
+    )
+    add_test(NAME test_libtorch_comparison COMMAND test_libtorch_comparison)
+    message(STATUS "Added test_libtorch_comparison (LibTorch found)")
+  else()
+    message(STATUS "Skipping test_libtorch_comparison (LibTorch not found)")
+  endif()
 
 endif()
 
