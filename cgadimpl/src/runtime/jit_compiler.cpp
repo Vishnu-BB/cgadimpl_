@@ -59,6 +59,45 @@ struct Compiled::Impl {
             case Op::RowMax: return OwnTensor::reduce_max(*a[0], {1}, true);
             case Op::MeanAll: return OwnTensor::reduce_mean(*a[0]);
 
+            case Op::GELU: {
+                const float c1 = 0.7978845608f; // sqrt(2.0f / M_PI)
+                const float c2 = 0.044715f;
+                Tensor x3 = (*a[0]) * (*a[0]) * (*a[0]);
+                Tensor u = ((*a[0]) + x3 * c2) * c1;
+                return (*a[0]) * (1.0f + OwnTensor::tanh(u)) * 0.5f;
+            }
+            case Op::Sigmoid:    return 1.0f / (1.0f + OwnTensor::exp((*a[0]) * -1.0f));
+            case Op::SiLU: {
+                Tensor s = 1.0f / (1.0f + OwnTensor::exp((*a[0]) * -1.0f));
+                return (*a[0]) * s;
+            }
+            case Op::LeakyRelu: {
+                // a[1] is alpha
+                float alpha = a[1]->to_cpu().data<float>()[0];
+                cudaStream_t stream = (cudaStream_t)ag::current_stream();
+                // LeakyRelu(x) = pos_part + alpha * neg_part
+                // pos_part = (x + abs(x)) * 0.5
+                // neg_part = (x - abs(x)) * 0.5
+                Tensor x = *a[0];
+                Tensor abs_x = OwnTensor::abs(x, stream);
+                Tensor pos_part = (x + abs_x) * 0.5f;
+                Tensor neg_part = (x - abs_x) * 0.5f;
+                return pos_part + (neg_part * alpha);
+            }
+            case Op::Softplus:   return OwnTensor::log(1.0f + OwnTensor::exp(*a[0]));
+            case Op::CeWithLogits: {
+                // a[0] is logits, a[1] is target
+                const Tensor& Z = *a[0];
+                const Tensor& Y = *a[1];
+                Tensor max_val = OwnTensor::reduce_max(Z, {-1}, true);
+                Tensor z_shifted = Z - max_val;
+                Tensor log_sum_exp = OwnTensor::log(OwnTensor::reduce_sum(OwnTensor::exp(z_shifted), {-1}, true));
+                Tensor log_sm = z_shifted - log_sum_exp;
+                Tensor prod = Y * log_sm;
+                Tensor sum_prod = OwnTensor::reduce_sum(prod, {-1});
+                return OwnTensor::reduce_mean(sum_prod * -1.0f);
+            }
+
             case Op::Leaf: default: {
                 // Shouldn't get called for Leaf
                 assert(false && "apply(): unexpected op");

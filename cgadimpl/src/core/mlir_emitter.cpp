@@ -141,6 +141,25 @@ MLIREmitter::emitModule(const Plan& plan) {
             }
         }, arg);
     };
+    
+    // Helper to get shape for Arg
+    auto getShapeForArg = [&](const Arg& arg) -> std::vector<int64_t> {
+        return std::visit([&](auto&& a) -> std::vector<int64_t> {
+            using T = std::decay_t<decltype(a)>;
+            if constexpr (std::is_same_v<T, ArgInput>) {
+                return plan.sig.in_meta[a.idx].shape;
+            } else if constexpr (std::is_same_v<T, ArgParam>) {
+                return plan.sig.param_meta[a.idx].shape;
+            } else if constexpr (std::is_same_v<T, ArgSlot>) {
+                for (const auto& s : plan.steps) {
+                    if (s.out_slot == a.slot) return s.out_meta.shape;
+                }
+                return {};
+            } else if constexpr (std::is_same_v<T, ArgLit>) {
+                return a.t.shape().dims;
+            }
+        }, arg);
+    };
 
     // Process each step
     for (const auto& step : plan.steps) {
@@ -221,6 +240,111 @@ MLIREmitter::emitModule(const Plan& plan) {
                 if (operands.size() == 1) {
                     result = builder.create<mlir::nova::ReluOp>(
                         loc, resultType, operands[0]
+                    ).getResult();
+                }
+                break;
+
+            case Op::GELU:
+                if (operands.size() == 1) {
+                    result = builder.create<mlir::nova::GeluOp>(
+                        loc, resultType, operands[0]
+                    ).getResult();
+                }
+                break;
+
+            case Op::Sigmoid:
+                if (operands.size() == 1) {
+                    result = builder.create<mlir::nova::SigmoidOp>(
+                        loc, resultType, operands[0]
+                    ).getResult();
+                }
+                break;
+
+            case Op::SiLU:
+                if (operands.size() == 1) {
+                    // SiLU(x) = x * sigmoid(x)
+                    auto sig = builder.create<mlir::nova::SigmoidOp>(
+                        loc, resultType, operands[0]
+                    ).getResult();
+                    result = builder.create<mlir::nova::MulOp>(
+                        loc, resultType, operands[0], sig
+                    ).getResult();
+                }
+                break;
+
+            case Op::LeakyRelu:
+                if (operands.size() == 2) {
+                    // LeakyRelu(x) = max(alpha * x, x)
+                    auto scaled = builder.create<mlir::nova::MulOp>(
+                        loc, resultType, operands[0], operands[1]
+                    ).getResult();
+                    result = builder.create<mlir::nova::MaxOp>(
+                        loc, resultType, scaled, operands[0]
+                    ).getResult();
+                }
+                break;
+
+            case Op::Softplus:
+                if (operands.size() == 1) {
+                    // Softplus(x) = log(1 + exp(x))
+                    auto exp_x = builder.create<mlir::nova::ExpOp>(
+                        loc, resultType, operands[0]
+                    ).getResult();
+                    
+                    // Create constant 1.0
+                    auto one_attr = mlir::DenseElementsAttr::get(resultType, llvm::ArrayRef<float>{1.0f});
+                    auto one = builder.create<mlir::nova::ConstantOp>(loc, resultType, one_attr).getResult();
+                    
+                    auto one_plus_exp = builder.create<mlir::nova::AddOp>(
+                        loc, resultType, one, exp_x
+                    ).getResult();
+                    result = builder.create<mlir::nova::LogOp>(
+                        loc, resultType, one_plus_exp
+                    ).getResult();
+                }
+                break;
+
+            case Op::CeWithLogits:
+                if (operands.size() == 2) {
+                    // loss = mean(-sum(target * (logits - log(sum(exp(logits - max(logits)))))))
+                    auto logitsShape = getShapeForArg(step.args[0]);
+                    int64_t batchSize = logitsShape[0];
+                    
+                    auto rowMaxType = mlir::RankedTensorType::get({batchSize, 1}, resultType.getElementType());
+                    auto m_logits = builder.create<mlir::nova::ReduceOp>(
+                        loc, mlir::nova::ReductionKind::MAX, operands[0], rowMaxType,
+                        /*keepdims=*/true, llvm::ArrayRef<int64_t>{1}, /*ignore_nan=*/false
+                    ).getResult();
+                    
+                    auto shifted = builder.create<mlir::nova::SubOp>(loc, operands[0], m_logits).getResult();
+                    
+                    auto exp_shifted = builder.create<mlir::nova::ExpOp>(loc, shifted).getResult();
+                    
+                    auto sum_exp = builder.create<mlir::nova::ReduceOp>(
+                        loc, mlir::nova::ReductionKind::SUM, exp_shifted, rowMaxType,
+                        /*keepdims=*/true, llvm::ArrayRef<int64_t>{1}, /*ignore_nan=*/false
+                    ).getResult();
+                    
+                    auto log_sum_exp = builder.create<mlir::nova::LogOp>(loc, sum_exp).getResult();
+                    
+                    auto log_softmax = builder.create<mlir::nova::SubOp>(loc, shifted, log_sum_exp).getResult();
+                    
+                    auto prod = builder.create<mlir::nova::MulOp>(loc, operands[1], log_softmax).getResult();
+                    
+                    auto batchType = mlir::RankedTensorType::get({batchSize}, resultType.getElementType());
+                    auto row_sum = builder.create<mlir::nova::ReduceOp>(
+                        loc, mlir::nova::ReductionKind::SUM, prod, batchType,
+                        /*keepdims=*/false, llvm::ArrayRef<int64_t>{1}, /*ignore_nan=*/false
+                    ).getResult();
+                    
+                    auto neg_one_attr = mlir::DenseElementsAttr::get(batchType, llvm::ArrayRef<float>{-1.0f});
+                    auto neg_one = builder.create<mlir::nova::ConstantOp>(loc, batchType, neg_one_attr).getResult();
+                    auto neg_row_sum = builder.create<mlir::nova::MulOp>(loc, row_sum, neg_one).getResult();
+                    
+                    auto scalarType = mlir::RankedTensorType::get({}, resultType.getElementType());
+                    result = builder.create<mlir::nova::ReduceOp>(
+                        loc, mlir::nova::ReductionKind::MEAN, neg_row_sum, scalarType,
+                        /*keepdims=*/false, llvm::ArrayRef<int64_t>{}, /*ignore_nan=*/false
                     ).getResult();
                 }
                 break;

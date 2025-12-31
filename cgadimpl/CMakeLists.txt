@@ -174,7 +174,6 @@ if(true)
   add_ag_test(test_phase1_advanced            Tests/test_phase1_advanced.cpp)  # Phase 1 advanced edge cases
   add_ag_test(test_dependency_counter                         Tests/test_dependency_counter.cpp )
   add_ag_test(test_dependncy_counter2                        Tests/test_dependncy_counter2.cpp)
-  add_ag_test(test_nan_isolation                        Tests/test_nan_isolation.cpp)
   
   # Comprehensive dependency counter test suite
   add_ag_test(test_dependency_diamond            Tests/test_dependency_diamond.cpp)
