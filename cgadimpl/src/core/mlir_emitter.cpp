@@ -79,8 +79,8 @@ MLIREmitter::emitModule(const Plan& plan) {
     const auto& output_meta = plan.steps.back().out_meta;
     auto output_shape = output_meta.shape;
     
-    // Total reduction rank adjustment: if it's a total reduction (Sum/MeanAll), it returns rank 0
-    if ((plan.steps.back().op == Op::Sum || plan.steps.back().op == Op::MeanAll) && 
+    // Total reduction rank adjustment: if it's a total reduction (Sum/MeanAll/CeWithLogits), it returns rank 0
+    if ((plan.steps.back().op == Op::Sum || plan.steps.back().op == Op::MeanAll || plan.steps.back().op == Op::CeWithLogits) && 
         output_shape.size() == 1 && output_shape[0] == 1) {
         output_shape = {};
     }

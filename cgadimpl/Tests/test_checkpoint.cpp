@@ -108,6 +108,7 @@ void run_memory_savings_test() {
     // Forward
     Value out_std = model.forward(input, false);
     ag::debug::dump_dot(out_std, "graph_no_checkpoint.jpg");
+    // auto comp = ag::jit::compile(loss, inputs, params);
     
     
     // In standard training, we keep ALL activations for backward
