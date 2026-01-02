@@ -89,8 +89,8 @@ void run_memory_savings_test() {
     std::cout << "==================================================\n\n";
     
     int depth = 50;
-    int hidden_dim = 1024;
-    int batch_size = 128;
+    int hidden_dim = 256;
+    int batch_size = 64;
     
     std::cout << "Model Config:\n";
     std::cout << "  - Depth: " << depth << " layers\n";
@@ -107,7 +107,7 @@ void run_memory_savings_test() {
     
     // Forward
     Value out_std = model.forward(input, false);
-    ag::debug::dump_dot(out_std, "graph_no_checkpoint.jpg");
+    // ag::debug::dump_dot(out_std, "graph_no_checkpoint.jpg");
     // auto comp = ag::jit::compile(loss, inputs, params);
     
     
@@ -164,7 +164,7 @@ void run_memory_savings_test() {
     // Step 3 & 4: Sweep with protection
     memory::sweep_safe_nodes(out_cp, memory::DeletePolicy::ForwardPass, anchors);
     memory::debug_deletion_state();
-    ag::debug::dump_dot(out_cp, "graph_with_checkpoint.jpg");
+    // ag::debug::dump_dot(out_cp, "graph_with_checkpoint.jpg");
     
     size_t mem_cp = calculate_graph_memory(out_cp);
     std::cout << "  Peak Memory (After Cleanup): " << (mem_cp / 1024.0 / 1024.0) << " MB\n";
