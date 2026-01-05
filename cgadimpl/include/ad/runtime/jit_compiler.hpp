@@ -25,7 +25,7 @@ struct Compiled {
     // Execute the compiled plan
     bool run(const std::vector<Tensor*>& inputs,
              const std::vector<Tensor*>& params,
-             Tensor& out) const;
+             std::vector<Tensor>& outputs) const;
 
     const std::string& getMLIRSource() const;
     void* getMLIRModule() const;
@@ -36,9 +36,14 @@ struct CompileOptions {
     // ... optimization flags ...
 };
 
-Compiled compile(const Value& output,
+Compiled compile(const std::vector<Value>& outputs,
                  const std::vector<Value>& inputs,
                  const std::vector<Value>& params,
                  const CompileOptions& opts = {});
+
+Compiled compile_with_backward(const Value& loss,
+                               const std::vector<Value>& inputs,
+                               const std::vector<Value>& params,
+                               const CompileOptions& opts = {});
 
 } // namespace ag::jit

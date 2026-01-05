@@ -70,25 +70,36 @@ MLIREmitter::emitModule(const Plan& plan) {
         inputTypes.push_back(createTensorType(builder, meta.shape, meta.dtype));
     }
 
-    // Output type comes from the last step
-    if (plan.steps.empty()) {
-        llvm::errs() << "Error: Empty plan in MLIR emission\n";
-        return {mlir::OwningOpRef<mlir::ModuleOp>(module), ""};
-    }
+    // Output types come from out_slots
+    llvm::SmallVector<mlir::Type, 4> outputTypes;
+    for (int slot : plan.out_slots) {
+        // Find the step that produces this slot to get metadata
+        const Step* target_step = nullptr;
+        for (const auto& s : plan.steps) {
+            if (s.out_slot == slot) {
+                target_step = &s;
+                break;
+            }
+        }
+        
+        if (!target_step) {
+            llvm::errs() << "Error: Output slot " << slot << " not found in plan\n";
+            return {mlir::OwningOpRef<mlir::ModuleOp>(module), ""};
+        }
 
-    const auto& output_meta = plan.steps.back().out_meta;
-    auto output_shape = output_meta.shape;
-    
-    // Total reduction rank adjustment: if it's a total reduction (Sum/MeanAll/CeWithLogits), it returns rank 0
-    if ((plan.steps.back().op == Op::Sum || plan.steps.back().op == Op::MeanAll || plan.steps.back().op == Op::CeWithLogits) && 
-        output_shape.size() == 1 && output_shape[0] == 1) {
-        output_shape = {};
+        auto output_shape = target_step->out_meta.shape;
+        
+        // Total reduction rank adjustment
+        if ((target_step->op == Op::Sum || target_step->op == Op::MeanAll || target_step->op == Op::CeWithLogits) && 
+            output_shape.size() == 1 && output_shape[0] == 1) {
+            output_shape = {};
+        }
+        
+        outputTypes.push_back(createTensorType(builder, output_shape, target_step->out_meta.dtype));
     }
-    
-    auto outputType = createTensorType(builder, output_shape, output_meta.dtype);
 
     // Create function type
-    auto funcType = builder.getFunctionType(inputTypes, outputType);
+    auto funcType = builder.getFunctionType(inputTypes, outputTypes);
 
     // Create function
     auto func = builder.create<mlir::func::FuncOp>(loc, "main", funcType);
@@ -208,6 +219,31 @@ MLIREmitter::emitModule(const Plan& plan) {
                 if (operands.size() == 2) {
                     result = builder.create<mlir::nova::MatmulOp>(
                         loc, resultType, operands[0], operands[1]
+                    ).getResult();
+                }
+                break;
+
+            case Op::Div:
+                if (operands.size() == 2) {
+                    result = builder.create<mlir::nova::DivOp>(
+                        loc, resultType, operands[0], operands[1]
+                    ).getResult();
+                }
+                break;
+
+            case Op::Abs:
+                if (operands.size() == 1) {
+                    result = builder.create<mlir::nova::AbsOp>(
+                        loc, resultType, operands[0]
+                    ).getResult();
+                }
+                break;
+
+            case Op::Transpose:
+                if (operands.size() == 1) {
+                    // Default transpose (-2, -1)
+                    result = builder.create<mlir::nova::TransposeOp>(
+                        loc, resultType, operands[0], -1, -2
                     ).getResult();
                 }
                 break;
@@ -427,13 +463,17 @@ MLIREmitter::emitModule(const Plan& plan) {
     }
 
     // Create return statement
-    auto returnValue = slotMap[plan.out_slot];
-    if (!returnValue) {
-        llvm::errs() << "Error: Output slot not found in MLIR emission\n";
-        return {mlir::OwningOpRef<mlir::ModuleOp>(module), ""};
+    llvm::SmallVector<mlir::Value, 4> returnValues;
+    for (int slot : plan.out_slots) {
+        auto val = slotMap[slot];
+        if (!val) {
+            llvm::errs() << "Error: Output slot " << slot << " not found in MLIR emission\n";
+            return {mlir::OwningOpRef<mlir::ModuleOp>(module), ""};
+        }
+        returnValues.push_back(val);
     }
 
-    builder.create<mlir::func::ReturnOp>(loc, returnValue);
+    builder.create<mlir::func::ReturnOp>(loc, returnValues);
 
     // Verify the module
     if (mlir::failed(mlir::verify(module))) {

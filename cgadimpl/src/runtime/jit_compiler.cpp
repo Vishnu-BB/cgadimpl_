@@ -14,6 +14,7 @@ namespace ag::jit {
 
 using ag::Op;
 using ag::Node;
+using ag::Value;
 
 // ===================================================================
 // JIT Compiler Implementation
@@ -43,6 +44,8 @@ struct Compiled::Impl {
             case Op::Add:        return *a[0] + *a[1];
             case Op::Sub:        return *a[0] - *a[1];
             case Op::Mul:        return *a[0] * *a[1];
+            case Op::Div:        return *a[0] / *a[1];
+            case Op::Abs:        return OwnTensor::abs(*a[0], (cudaStream_t)ag::current_stream());
 
             // Unary operators now use the free functions from the OwnTensor namespace.
             case Op::Transpose:  return a[0]->transpose(-2, -1);
@@ -108,7 +111,7 @@ struct Compiled::Impl {
 
     bool run(const std::vector<Tensor*>& inputs,
              const std::vector<Tensor*>& params,
-             Tensor& out) const {
+             std::vector<Tensor>& outputs) const {
         if (!plan.sig.matches(inputs, params)) return false;
 
         std::vector<Tensor> slots(plan.num_slots);
@@ -123,22 +126,24 @@ struct Compiled::Impl {
         for (const Step& st : plan.steps) {
             std::vector<const Tensor*> args; args.reserve(st.args.size());
             
-            Tensor tmp{OwnTensor::Shape{}, OwnTensor::TensorOptions{}}; 
-            
             std::vector<Tensor> tmp_keep; tmp_keep.reserve(st.args.size());
             for (const Arg& a : st.args) {
                 if (std::holds_alternative<ArgLit>(a)) {
                     tmp_keep.emplace_back(std::get<ArgLit>(a).t);
                     args.push_back(&tmp_keep.back());
                 } else {
-                    args.push_back(&as_ref(a, inputs, params, slots, tmp));
+                    Tensor dummy;
+                    args.push_back(&as_ref(a, inputs, params, slots, dummy));
                 }
             }
             Tensor y = apply(st.op, args);
             slots[st.out_slot] = std::move(y);
         }
 
-        out = slots[plan.out_slot];
+        outputs.clear();
+        for (int slot : plan.out_slots) {
+            outputs.push_back(slots[slot]);
+        }
         return true;
     }
 };
@@ -186,14 +191,34 @@ static std::string emitMLIR(const Plan& plan) {
             const auto& meta = metas[i];
             ss << "%arg" << arg_idx_counter++ << ": tensor<" 
                << shapeToMLIR(meta.shape) << dtypeToMLIR(meta.dtype) << ">";
-            if (i < metas.size() - 1 || !plan.sig.param_meta.empty()) ss << "";
+            if (i < metas.size() - 1 || !plan.sig.param_meta.empty()) ss << ", ";
         }
     };
 
     print_arg_meta(plan.sig.in_meta);
-    ss << ") -> tensor<" 
-       << shapeToMLIR(plan.steps.back().out_meta.shape) 
-       << dtypeToMLIR(plan.steps.back().out_meta.dtype) << "> {\n";
+    if (!plan.sig.param_meta.empty()) {
+        ss << ", ";
+        print_arg_meta(plan.sig.param_meta);
+    }
+    ss << ") -> (";
+    
+    for (size_t i = 0; i < plan.out_slots.size(); ++i) {
+        int slot = plan.out_slots[i];
+        // Find meta for this slot
+        const TensorMetadata* meta = nullptr;
+        for (const auto& st : plan.steps) {
+            if (st.out_slot == slot) {
+                meta = &st.out_meta;
+                break;
+            }
+        }
+        
+        if (meta) {
+             ss << "tensor<" << shapeToMLIR(meta->shape) << dtypeToMLIR(meta->dtype) << ">";
+        }
+        if (i < plan.out_slots.size() - 1) ss << ", ";
+    }
+    ss << ") {\n";
 
     std::unordered_map<int, std::string> slot_to_var_name;
     std::unordered_map<int, TensorMetadata> slot_to_meta;
@@ -216,7 +241,8 @@ static std::string emitMLIR(const Plan& plan) {
                 if constexpr (std::is_same_v<T, ArgInput> || std::is_same_v<T, ArgParam>) {
                     int arg_idx = a.idx; 
                     const auto& meta = (std::is_same_v<T, ArgInput>) ? plan.sig.in_meta[arg_idx] : plan.sig.param_meta[arg_idx];
-                    arg_names.push_back("%arg" + std::to_string(arg_idx));
+                    int base_idx = (std::is_same_v<T, ArgInput>) ? 0 : plan.sig.in_meta.size();
+                    arg_names.push_back("%arg" + std::to_string(base_idx + arg_idx));
                     arg_types.push_back("tensor<" + shapeToMLIR(meta.shape) + dtypeToMLIR(meta.dtype) + ">");
                 } else if constexpr (std::is_same_v<T, ArgSlot>) {
                     arg_names.push_back(slot_to_var_name.at(a.slot));
@@ -238,26 +264,116 @@ static std::string emitMLIR(const Plan& plan) {
             ss << arg_types[j];
             if (j < arg_types.size() - 1) ss << ", ";
         }
-        ss << "\n";
+        ss << " -> tensor<" << shapeToMLIR(st.out_meta.shape) << dtypeToMLIR(st.out_meta.dtype) << ">\n";
     }
 
-    std::string return_var = slot_to_var_name.at(plan.out_slot);
-    const auto& return_meta = plan.steps.back().out_meta;
-    auto return_shape = return_meta.shape;
-    
-    if ((plan.steps.back().op == Op::Sum || plan.steps.back().op == Op::MeanAll) && 
-        return_shape.size() == 1 && return_shape[0] == 1) {
-        return_shape = {};
+    ss << "  return ";
+    for (size_t i = 0; i < plan.out_slots.size(); ++i) {
+        ss << slot_to_var_name.at(plan.out_slots[i]);
+        if (i < plan.out_slots.size() - 1) ss << ", ";
     }
-
-    ss << "  return " << return_var << " : tensor<"
-       << shapeToMLIR(return_shape) 
-       << dtypeToMLIR(return_meta.dtype) << ">\n";
-    ss << "}\n";
+    ss << " : ";
+    for (size_t i = 0; i < plan.out_slots.size(); ++i) {
+        int slot = plan.out_slots[i];
+        const auto& return_meta = slot_to_meta.at(slot);
+        ss << "tensor<" << shapeToMLIR(return_meta.shape) << dtypeToMLIR(return_meta.dtype) << ">";
+        if (i < plan.out_slots.size() - 1) ss << ", ";
+    }
+    ss << "\n}\n";
     return ss.str();
 }
 
-Compiled compile(const Value& output,
+static std::vector<Value> get_symbolic_grads(const Value& loss, const std::vector<Value>& params) {
+    auto order = topo_from(loss.node.get());
+    std::unordered_map<Node*, Value> grads;
+
+    // Seed: dL/dL = 1.0 (Same shape as loss, usually scalar)
+    Tensor one_t = OwnTensor::Tensor::ones(loss.shape(), ag::options(loss.val()));
+    grads[loss.node.get()] = make_tensor(one_t, "loss_grad_seed");
+
+    for (auto it = order.rbegin(); it != order.rend(); ++it) {
+        Node* n = *it;
+        if (grads.find(n) == grads.end()) continue;
+        Value gy = grads[n];
+
+        auto add_grad = [&](Node* node, Value g) {
+            if (!node || !node->requires_grad()) return;
+            if (grads.count(node)) grads[node] = grads[node] + g;
+            else grads[node] = g;
+        };
+
+        switch (n->op) {
+            case Op::Add:
+                add_grad(n->inputs[0].get(), gy);
+                add_grad(n->inputs[1].get(), gy);
+                break;
+            case Op::Sub:
+                add_grad(n->inputs[0].get(), gy);
+                add_grad(n->inputs[1].get(), gy * -1.0f);
+                break;
+            case Op::Mul:
+                add_grad(n->inputs[0].get(), gy * Value(n->inputs[1]));
+                add_grad(n->inputs[1].get(), gy * Value(n->inputs[0]));
+                break;
+            case Op::Div: {
+                Value a(n->inputs[0]), b(n->inputs[1]);
+                add_grad(a.node.get(), gy / b);
+                add_grad(b.node.get(), gy * (a * -1.0f) / (b * b));
+                break;
+            }
+            case Op::MatMul:
+                add_grad(n->inputs[0].get(), matmul(gy, transpose(Value(n->inputs[1]))));
+                add_grad(n->inputs[1].get(), matmul(transpose(Value(n->inputs[0])), gy));
+                break;
+            case Op::Sum:
+                add_grad(n->inputs[0].get(), gy); // Sum gradient just broadcasts back
+                break;
+            case Op::MeanAll: {
+                float scale = 1.0f / (float)n->inputs[0]->value.numel();
+                add_grad(n->inputs[0].get(), gy * scale);
+                break;
+            }
+            case Op::Exp:
+                add_grad(n->inputs[0].get(), gy * Value(n->shared_from_this()));
+                break;
+            case Op::Log:
+                add_grad(n->inputs[0].get(), gy / Value(n->inputs[0]));
+                break;
+            case Op::Tanh: {
+                Value y(n->shared_from_this());
+                add_grad(n->inputs[0].get(), gy * (1.0f - y * y));
+                break;
+            }
+            case Op::Sigmoid: {
+                Value y(n->shared_from_this());
+                add_grad(n->inputs[0].get(), gy * y * (1.0f - y));
+                break;
+            }
+            case Op::Relu: {
+                // Approximate dy/dx = (x > 0 ? 1 : 0)
+                Value x(n->inputs[0]);
+                Value mask = (sign(x, x) + 1.0f) * 0.5f; 
+                add_grad(n->inputs[0].get(), gy * mask);
+                break;
+            }
+            default:
+                break;
+        }
+    }
+
+    std::vector<Value> param_grads;
+    for (const auto& p : params) {
+        if (grads.count(p.node.get())) {
+            param_grads.push_back(grads[p.node.get()]);
+        } else {
+            // No path from loss to this param - return zeros
+            param_grads.push_back(make_tensor(OwnTensor::Tensor::zeros(p.shape(), ag::options(p.val())), "zero_grad"));
+        }
+    }
+    return param_grads;
+}
+
+Compiled compile(const std::vector<Value>& outputs,
                  const std::vector<Value>& inputs,
                  const std::vector<Value>& params,
                  const CompileOptions&) {
@@ -275,7 +391,32 @@ Compiled compile(const Value& output,
         plan.sig.param_meta.push_back({v.shape(), v.val().dtype(), v.val().device()});
     }
 
-    auto order = topo_from(output.node.get());
+    // Collect all nodes needed for all outputs
+    std::vector<Node*> order;
+    std::unordered_set<Node*> seen;
+    for (const auto& out : outputs) {
+        auto sub_order = topo_from(out.node.get());
+        for (Node* n : sub_order) {
+            if (seen.find(n) == seen.end()) {
+                order.push_back(n);
+                seen.insert(n);
+            }
+        }
+    }
+    
+    // Simple topological sort might not be enough if outputs depend on each other or have shared nodes
+    // but topo_from already produces an order. We should merge them correctly.
+    // Let's use a simpler approach: collect all reachable nodes and then do one topo sort.
+    seen.clear();
+    order.clear();
+    std::function<void(Node*)> collect = [&](Node* n) {
+        if (!n || seen.count(n)) return;
+        seen.insert(n);
+        for (auto& in : n->inputs) collect(in.get());
+        order.push_back(n);
+    };
+    for (const auto& out : outputs) collect(out.node.get());
+
     std::unordered_map<Node*,int> slot_of;
     slot_of.reserve(order.size());
 
@@ -300,7 +441,10 @@ Compiled compile(const Value& output,
         }
         plan.steps.push_back(std::move(st));
     }
-    plan.out_slot = slot_of.at(output.node.get());
+    
+    for (const auto& out : outputs) {
+        plan.out_slots.push_back(slot_of.at(out.node.get()));
+    }
 
     std::string generated_mlir_opbuilder;
     mlir::OwningOpRef<mlir::ModuleOp> in_memory_module;
@@ -355,8 +499,8 @@ Compiled compile(const Value& output,
 
 bool Compiled::run(const std::vector<Tensor*>& inputs,
                    const std::vector<Tensor*>& params,
-                   Tensor& out) const {
-    return p->run(inputs, params, out);
+                   std::vector<Tensor>& outputs) const {
+    return p->run(inputs, params, outputs);
 }
 
 const std::string& Compiled::getMLIRSource() const {
@@ -371,6 +515,19 @@ void* Compiled::getMLIRModule() const {
         }
     }
     return nullptr;
+}
+
+Compiled compile_with_backward(const Value& loss,
+                               const std::vector<Value>& inputs,
+                               const std::vector<Value>& params,
+                               const CompileOptions& opts) {
+    std::vector<Value> grads = get_symbolic_grads(loss, params);
+    
+    std::vector<Value> all_roots;
+    all_roots.push_back(loss);
+    for (const auto& g : grads) all_roots.push_back(g);
+    
+    return compile(all_roots, inputs, params, opts);
 }
 
 } // namespace ag::jit
