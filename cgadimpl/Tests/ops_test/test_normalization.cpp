@@ -19,7 +19,7 @@ void test_layernorm() {
     
     // Check output shape
     if (y.node->value.shape().dims != std::vector<int64_t>{2, 4}) {
-        std::cout << "❌ Failed Forward Shape\n";
+        std::cout << "   Failed Forward Shape\n";
         return;
     }
     

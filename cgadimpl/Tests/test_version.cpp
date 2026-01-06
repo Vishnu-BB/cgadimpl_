@@ -49,7 +49,7 @@ int main() {
     if (ver3 > ver2 && ver2 > ver1 && ver1 > ver0)
         std::cout << "  Version numbers increased monotonically.\n";
     else
-        std::cout << "❌ Versioning sequence incorrect!\n";
+        std::cout << "   Versioning sequence incorrect!\n";
 
     std::cout << "===== Versioning System Test Completed =====\n";
     return 0;

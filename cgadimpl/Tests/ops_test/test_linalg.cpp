@@ -42,7 +42,7 @@ void test_matmul() {
     
     Tensor expected = create_tensor(std::vector<float>{3, 3, 3, 3}.data(), Shape{{2, 2}}, opts);
     if (!compare_tensors(C.node->value, expected)) {
-        std::cout << "❌ Failed Forward\n";
+        std::cout << "   Failed Forward\n";
         return;
     }
     
@@ -54,7 +54,7 @@ void test_matmul() {
     
     Tensor expected_grad_A = create_tensor(std::vector<float>{2, 2, 2, 2, 2, 2}.data(), Shape{{2, 3}}, opts);
     if (!compare_tensors(A.node->grad, expected_grad_A)) {
-        std::cout << "❌ Failed Backward (A)\n";
+        std::cout << "   Failed Backward (A)\n";
         return;
     }
     std::cout << "  Passed\n";
@@ -70,7 +70,7 @@ void test_transpose() {
     Value B = transpose(A); // [3, 2]
     
     if (B.node->value.shape().dims != std::vector<int64_t>{3, 2}) {
-        std::cout << "❌ Failed Forward Shape\n";
+        std::cout << "   Failed Forward Shape\n";
         return;
     }
     
@@ -78,7 +78,7 @@ void test_transpose() {
     // L = sum(A^T). dL/dA = ones(2, 3).
     Tensor expected_grad = Tensor::ones(Shape{{2, 3}}, opts);
     if (!compare_tensors(A.node->grad, expected_grad)) {
-        std::cout << "❌ Failed Backward. Expected: Ones. Got: ";
+        std::cout << "   Failed Backward. Expected: Ones. Got: ";
         if (A.node->grad.numel() == 0) std::cout << "<empty>";
         else {
              Tensor g = A.node->grad.to_cpu();
@@ -111,7 +111,7 @@ void test_linear() {
     
     Tensor expected = create_tensor(std::vector<float>{4.0f, 7.0f, 10.0f}.data(), Shape{{1, 3}}, opts);
     if (!compare_tensors(y.node->value, expected)) {
-        std::cout << "❌ Failed Forward\n";
+        std::cout << "   Failed Forward\n";
         return;
     }
     

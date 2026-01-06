@@ -25,7 +25,7 @@ int main() {
     Value  X  = make_tensor(Tensor::randn(Shape{{B, In}}, TensorOptions().with_dtype(Dtype::Bfloat16)), "X");
 
     // One-hot labels Y[B,Out]
-    Tensor Yt(Shape{{B, Out}}, TensorOptions());
+    Tensor Yt(Shape{{B, Out}}, TensorOptions().with_dtype(Dtype::Bfloat16));
     bfloat16_t* yt_data = Yt.data<bfloat16_t>(); // Get data pointer to fill
     std::mt19937 gen(42);
     std::uniform_int_distribution<int> pick(0, Out - 1);

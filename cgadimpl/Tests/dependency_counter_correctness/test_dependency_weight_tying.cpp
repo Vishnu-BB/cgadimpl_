@@ -66,7 +66,7 @@ int main() {
     std::cout << "  W gradient computed: " << (grad_w.numel() > 0 ? "✓" : "✗") << std::endl;
     std::cout << "  Gradient numel: " << grad_w.numel() << std::endl;
     
-    std::cout << "\n🎯 Key Behavior:" << std::endl;
+    std::cout << "\n Key Behavior:" << std::endl;
     std::cout << "   The gradient of W is the SUM of gradients from all 4 uses:" << std::endl;
     std::cout << "   " << std::endl;
     std::cout << "   grad(W) = grad_from_use1 + grad_from_use2 " << std::endl;

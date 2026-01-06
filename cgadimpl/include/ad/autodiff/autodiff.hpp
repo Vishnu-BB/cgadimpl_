@@ -7,7 +7,9 @@
 
 
 namespace ag {
-
+namespace detail{
+    Tensor to_fp32_if_float(const Tensor& t);
+}
 
 void zero_grad(const Value& root);
 void backward (const Value& root, const Tensor* grad_seed=nullptr, bool enable_parallel=false);

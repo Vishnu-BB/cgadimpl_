@@ -43,7 +43,7 @@ void test_add_sub() {
     
     Tensor expected_d = Tensor::ones(Shape{{2}}, opts);
     if (!compare_tensors(d.node->value, expected_d)) {
-        std::cout << "❌ Failed Forward\n";
+        std::cout << "   Failed Forward\n";
         return;
     }
     
@@ -58,13 +58,13 @@ void test_add_sub() {
     // Check grad a is 0
     Tensor expected_grad_a = Tensor::zeros(Shape{{2}}, opts);
     if (!compare_tensors(a.node->grad, expected_grad_a)) {
-        std::cout << "❌ Failed Backward (a)\n";
+        std::cout << "   Failed Backward (a)\n";
         return;
     }
     // Check grad b is 1
     Tensor expected_grad_b = Tensor::ones(Shape{{2}}, opts);
     if (!compare_tensors(b.node->grad, expected_grad_b)) {
-        std::cout << "❌ Failed Backward (b)\n";
+        std::cout << "   Failed Backward (b)\n";
         return;
     }
     std::cout << "  Passed\n";
@@ -86,7 +86,7 @@ void test_mul_div() {
     Value d = div(c, a); // [2, 4] == b
     
     if (!compare_tensors(d.node->value, b.node->value)) {
-        std::cout << "❌ Failed Forward\n";
+        std::cout << "   Failed Forward\n";
         return;
     }
     
@@ -100,12 +100,12 @@ void test_mul_div() {
     
     Tensor expected_grad_a = Tensor::zeros(Shape{{2}}, opts);
     if (!compare_tensors(a.node->grad, expected_grad_a)) {
-        std::cout << "❌ Failed Backward (a)\n";
+        std::cout << "   Failed Backward (a)\n";
         return;
     }
     Tensor expected_grad_b = Tensor::ones(Shape{{2}}, opts);
     if (!compare_tensors(b.node->grad, expected_grad_b)) {
-        std::cout << "❌ Failed Backward (b)\n";
+        std::cout << "   Failed Backward (b)\n";
         return;
     }
     std::cout << "  Passed\n";
@@ -134,7 +134,7 @@ void test_fmab() {
     
     Tensor expected = create_tensor(std::vector<float>{3.0f, 3.0f, 3.0f, 3.0f}.data(), Shape{{2, 2}}, opts);
     if (!compare_tensors(y.node->value, expected)) {
-        std::cout << "❌ Failed Forward\n";
+        std::cout << "   Failed Forward\n";
         return;
     }
     
@@ -156,7 +156,7 @@ void test_edge_cases() {
     
     Tensor c_val = c.node->value.to_cpu();
     if (!std::isnan(c_val.data<float>()[0])) {
-        std::cout << "❌ Failed NaN propagation\n";
+        std::cout << "   Failed NaN propagation\n";
         return;
     }
     
@@ -165,7 +165,7 @@ void test_edge_cases() {
     Value e = add(d, b);
     Tensor e_val = e.node->value.to_cpu();
     if (!std::isinf(e_val.data<float>()[0])) {
-        std::cout << "❌ Failed Inf propagation\n";
+        std::cout << "   Failed Inf propagation\n";
         return;
     }
     

@@ -40,7 +40,7 @@ void test_sin_cos() {
     Tensor expected_c = create_tensor(std::vector<float>{1.0f}.data(), Shape{{1}}, opts);
     
     if (!compare_tensors(s.node->value, expected_s) || !compare_tensors(c.node->value, expected_c)) {
-        std::cout << "❌ Failed Forward\n";
+        std::cout << "   Failed Forward\n";
         return;
     }
     
@@ -49,7 +49,7 @@ void test_sin_cos() {
     
     Tensor expected_grad = create_tensor(std::vector<float>{1.0f}.data(), Shape{{1}}, opts);
     if (!compare_tensors(x.node->grad, expected_grad)) {
-        std::cout << "❌ Failed Backward\n";
+        std::cout << "   Failed Backward\n";
         return;
     }
     std::cout << "  Passed\n";

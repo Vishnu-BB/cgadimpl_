@@ -36,7 +36,7 @@ void test_sum() {
     
     Tensor expected = create_tensor(std::vector<float>{4.0f}.data(), Shape{{1}}, opts);
     if (!compare_tensors(y.node->value, expected)) {
-        std::cout << "❌ Failed Forward\n";
+        std::cout << "   Failed Forward\n";
         return;
     }
     
@@ -44,7 +44,7 @@ void test_sum() {
     // grad x should be all ones
     Tensor expected_grad = Tensor::ones(Shape{{2, 2}}, opts);
     if (!compare_tensors(x.node->grad, expected_grad)) {
-        std::cout << "❌ Failed Backward\n";
+        std::cout << "   Failed Backward\n";
         return;
     }
     std::cout << "  Passed\n";
@@ -65,7 +65,7 @@ void test_rowsum() {
     Tensor expected = create_tensor(std::vector<float>{3.0f, 7.0f}.data(), Shape{{2, 1}}, opts); // Or {2} depending on impl
     // Let's check shape
     if (y.node->value.numel() != 2) {
-         std::cout << "❌ Failed Forward Numel\n";
+         std::cout << "   Failed Forward Numel\n";
          return;
     }
     
@@ -73,7 +73,7 @@ void test_rowsum() {
     // grad x should be ones
     Tensor expected_grad = Tensor::ones(Shape{{2, 2}}, opts);
     if (!compare_tensors(x.node->grad, expected_grad)) {
-        std::cout << "❌ Failed Backward\n";
+        std::cout << "   Failed Backward\n";
         return;
     }
     std::cout << "  Passed\n";
@@ -89,7 +89,7 @@ void test_softmax_row() {
     
     Tensor expected = create_tensor(std::vector<float>{0.5f, 0.5f}.data(), Shape{{1, 2}}, opts);
     if (!compare_tensors(y.node->value, expected)) {
-        std::cout << "❌ Failed Forward\n";
+        std::cout << "   Failed Forward\n";
         return;
     }
     
@@ -100,7 +100,7 @@ void test_softmax_row() {
     
     Tensor expected_grad = Tensor::zeros(Shape{{1, 2}}, opts);
     if (!compare_tensors(x.node->grad, expected_grad)) {
-        std::cout << "❌ Failed Backward\n";
+        std::cout << "   Failed Backward\n";
         return;
     }
     std::cout << "  Passed\n";

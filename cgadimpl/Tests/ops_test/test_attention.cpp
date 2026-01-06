@@ -43,14 +43,14 @@ void test_attention_op() {
         // Just check it runs and produces output of expected shape
         // Output should be [1, 4, 8] usually
         if (out.node->value.shape().dims != std::vector<int64_t>{1, 4, 8}) {
-             std::cout << "❌ Unexpected output shape\n";
+             std::cout << "   Unexpected output shape\n";
              return;
         }
         
         backward(sum(out));
         std::cout << "  Passed\n";
     } catch (const std::exception& e) {
-        std::cout << "❌ Failed: " << e.what() << "\n";
+        std::cout << "   Failed: " << e.what() << "\n";
     }
 }
 

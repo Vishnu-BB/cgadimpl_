@@ -66,7 +66,7 @@ void test_numerical_parity() {
     memory::sweep_safe_nodes(loss_cp, memory::DeletePolicy::ForwardPass, {loss_cp.node.get(), x.node.get(), w1.node.get(), w2.node.get()});
     
     if (h1_cp.node->value.numel() != 0) {
-        std::cout << "❌ Failed: h1_cp value not deleted\n";
+        std::cout << "   Failed: h1_cp value not deleted\n";
         return;
     }
     
@@ -77,7 +77,7 @@ void test_numerical_parity() {
         compare_tensors(grad_w2_ref, w2.node->grad)) {
         std::cout << "  Passed\n";
     } else {
-        std::cout << "❌ Failed: Gradient mismatch\n";
+        std::cout << "   Failed: Gradient mismatch\n";
     }
 }
 
@@ -112,7 +112,7 @@ void test_deep_graph() {
         backward(loss);
         std::cout << "  Passed (Depth: " << depth << ")\n";
     } catch (const std::exception& e) {
-        std::cout << "❌ Failed: " << e.what() << "\n";
+        std::cout << "   Failed: " << e.what() << "\n";
     }
 }
 
@@ -136,7 +136,7 @@ void test_diamond_pattern() {
         backward(loss);
         std::cout << "  Passed\n";
     } catch (const std::exception& e) {
-        std::cout << "❌ Failed: " << e.what() << "\n";
+        std::cout << "   Failed: " << e.what() << "\n";
     }
 }
 
@@ -164,7 +164,7 @@ void test_nested_checkpointing() {
         backward(loss);
         std::cout << "  Passed\n";
     } catch (const std::exception& e) {
-        std::cout << "❌ Failed: " << e.what() << "\n";
+        std::cout << "   Failed: " << e.what() << "\n";
     }
 }
 
@@ -185,7 +185,7 @@ void test_leaf_checkpointing() {
         backward(loss);
         std::cout << "  Passed\n";
     } catch (const std::exception& e) {
-        std::cout << "❌ Failed: " << e.what() << "\n";
+        std::cout << "   Failed: " << e.what() << "\n";
     }
 }
 
@@ -226,7 +226,7 @@ void test_inplace_interaction() {
         // If backward succeeded, it means the system handled the missing/stale value.
         std::cout << "  Passed\n";
     } catch (const std::exception& e) {
-        std::cout << "❌ Failed: " << e.what() << "\n";
+        std::cout << "   Failed: " << e.what() << "\n";
     }
 }
 
@@ -252,7 +252,7 @@ void test_memory_pressure() {
         backward(loss);
         std::cout << "  Passed\n";
     } catch (const std::exception& e) {
-        std::cout << "❌ Failed: " << e.what() << "\n";
+        std::cout << "   Failed: " << e.what() << "\n";
     }
 }
 

@@ -42,7 +42,7 @@ void test_mse() {
     
     Tensor expected = create_tensor(std::vector<float>{0.5f}.data(), Shape{{1}}, opts);
     if (!compare_tensors(loss.node->value, expected)) {
-        std::cout << "❌ Failed Forward. Got " << loss.node->value.to_cpu().data<float>()[0] << "\n";
+        std::cout << "   Failed Forward. Got " << loss.node->value.to_cpu().data<float>()[0] << "\n";
         return;
     }
     
@@ -53,7 +53,7 @@ void test_mse() {
     
     Tensor expected_grad = create_tensor(std::vector<float>{0.0f, 1.0f}.data(), Shape{{2}}, opts);
     if (!compare_tensors(pred.node->grad, expected_grad)) {
-        std::cout << "❌ Failed Backward\n";
+        std::cout << "   Failed Backward\n";
         return;
     }
     std::cout << "  Passed\n";
@@ -90,7 +90,7 @@ void test_cross_entropy() {
     if (std::abs(g1 + 0.2689f) < 1e-3 && std::abs(g2 - 0.2689f) < 1e-3) {
         std::cout << "  Passed\n";
     } else {
-        std::cout << "❌ Failed Backward. Got " << g1 << ", " << g2 << "\n";
+        std::cout << "   Failed Backward. Got " << g1 << ", " << g2 << "\n";
     }
 }
 

@@ -108,7 +108,7 @@ int main() {
     // Results
     // ========================================
     std::cout << "\n========================================" << std::endl;
-    std::cout << "📊 PERFORMANCE RESULTS" << std::endl;
+    std::cout << " PERFORMANCE RESULTS" << std::endl;
     std::cout << "========================================" << std::endl;
     std::cout << std::fixed << std::setprecision(2);
     std::cout << "Sequential time:  " << std::setw(8) << duration_seq.count() << " ms" << std::endl;
@@ -121,18 +121,18 @@ int main() {
         std::cout << "----------------------------------------" << std::endl;
         
         if (speedup > 1.5) {
-            std::cout << "\n🎉 Excellent speedup!" << std::endl;
+            std::cout << "\n  Excellent speedup!" << std::endl;
             std::cout << "   The dependency counter successfully enabled" << std::endl;
             std::cout << "   parallel execution across multiple CPU cores!" << std::endl;
         } else {
-            std::cout << "\nℹ️  Speedup is modest. This can happen because:" << std::endl;
+            std::cout << "\n Speedup is modest. This can happen because:" << std::endl;
             std::cout << "   1. Graph might not have enough parallelism" << std::endl;
             std::cout << "   2. Threading overhead can dominate for small ops" << std::endl;
             std::cout << "   3. Memory bandwidth can be a bottleneck" << std::endl;
         }
     }
     
-    std::cout << "\n🎯 Key Insight:" << std::endl;
+    std::cout << "\n Key Insight:" << std::endl;
     std::cout << "   The dependency counter algorithm allows us to:" << std::endl;
     std::cout << "   • Process independent branches in parallel" << std::endl;
     std::cout << "   • Maintain correctness via atomic counters" << std::endl;

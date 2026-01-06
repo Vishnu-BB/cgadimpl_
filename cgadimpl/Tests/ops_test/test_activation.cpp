@@ -51,7 +51,7 @@ void test_relu() {
     Tensor expected = create_tensor(expected_data.data(), Shape{{4}}, opts);
     
     if (!compare_tensors(y.node->value, expected)) {
-        std::cout << "❌ Failed Forward\n";
+        std::cout << "   Failed Forward\n";
         return;
     }
     
@@ -61,7 +61,7 @@ void test_relu() {
     
     Tensor expected_grad = create_tensor(expected_grad_data.data(), Shape{{4}}, opts);
     if (!compare_tensors(x.node->grad, expected_grad)) {
-         std::cout << "❌ Failed Backward. Expected: ";
+         std::cout << "   Failed Backward. Expected: ";
          for(auto v : expected_grad_data) std::cout << v << " ";
          std::cout << "\nGot: ";
          if (x.node->grad.numel() == 0) {
@@ -91,7 +91,7 @@ void test_sigmoid() {
     
     Tensor expected = create_tensor(std::vector<float>{0.5f}.data(), Shape{{1}}, opts);
     if (!compare_tensors(y.node->value, expected)) {
-        std::cout << "❌ Failed Forward\n";
+        std::cout << "   Failed Forward\n";
         return;
     }
     
@@ -99,7 +99,7 @@ void test_sigmoid() {
     Tensor expected_grad = create_tensor(std::vector<float>{0.25f}.data(), Shape{{1}}, opts);
     
     if (!compare_tensors(x.node->grad, expected_grad)) {
-        std::cout << "❌ Failed Backward. Expected: 0.25\nGot: ";
+        std::cout << "   Failed Backward. Expected: 0.25\nGot: ";
         if (x.node->grad.numel() == 0) {
              std::cout << "<empty>";
         } else {
@@ -125,7 +125,7 @@ void test_tanh() {
     
     Tensor expected = create_tensor(std::vector<float>{0.0f}.data(), Shape{{1}}, opts);
     if (!compare_tensors(y.node->value, expected)) {
-        std::cout << "❌ Failed Forward\n";
+        std::cout << "   Failed Forward\n";
         return;
     }
     
@@ -133,7 +133,7 @@ void test_tanh() {
     Tensor expected_grad = create_tensor(std::vector<float>{1.0f}.data(), Shape{{1}}, opts);
     
     if (!compare_tensors(x.node->grad, expected_grad)) {
-        std::cout << "❌ Failed Backward. Expected: 1.0\nGot: ";
+        std::cout << "   Failed Backward. Expected: 1.0\nGot: ";
         if (x.node->grad.numel() == 0) {
              std::cout << "<empty>";
         } else {
@@ -159,7 +159,7 @@ void test_edge_cases() {
     
     Tensor y_val = y.node->value.to_cpu();
     if (!std::isnan(y_val.data<float>()[0])) {
-        std::cout << "❌ Failed NaN propagation in ReLU\n";
+        std::cout << "   Failed NaN propagation in ReLU\n";
         return;
     }
     

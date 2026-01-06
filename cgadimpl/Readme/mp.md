@@ -39,11 +39,11 @@ The library has the **foundational building blocks** (datatypes and kernels) for
 | :--- | :---: | :--- |
 | **BF16/FP16 Storage** |   | `tensor/include/dtype/Dtype.h` |
 | **Half-Precision Forward/Backward Kernels** |   | `tensor/src/TensorOps/cuda/` |
-| **Efficient GPU Casting (FP32 ↔ BF16/FP16)** | ❌ | Needs native CUDA kernels in `as_type` |
+| **Efficient GPU Casting (FP32 ↔ BF16/FP16)** |    | Needs native CUDA kernels in `as_type` |
 | **Stateful Optimizer (Adam)** |   | `cgadimpl/src/optimizer/optim.cpp` |
-| **Master Weight Logic** | ❌ | Needs FP32 master copies for BF16/FP16 params |
-| **High-Precision Moments** | ❌ | Adam moments should stay FP32 even for BF16 params |
-| **Loss Scaling Mechanism** | ❌ | Needs implementation in `autodiff.cpp` |
+| **Master Weight Logic** |    | Needs FP32 master copies for BF16/FP16 params |
+| **High-Precision Moments** |    | Adam moments should stay FP32 even for BF16 params |
+| **Loss Scaling Mechanism** |    | Needs implementation in `autodiff.cpp` |
 
 ## Conclusion
 

@@ -16,6 +16,7 @@
 // =============================================
 #include <unordered_map>
 #include <stdexcept>
+#include <iostream>
 
 #include "ad/autodiff/autodiff.hpp"
 #include "ad/detail/autodiff_ops.hpp"
@@ -98,7 +99,10 @@ void backward(const Value& root, const Tensor* grad_seed, bool enable_parallel){
             }
             
             VjpFn fn = vjp_lookup(n->op);
-            if (fn) fn(n, gy);
+            if (fn) {
+                VjpContext ctx(n, detail::to_fp32_if_float(gy));
+                fn(ctx);
+            }
 
             for (auto& hook : n->post_acc_grad_hooks) {
                 hook(n);
@@ -136,6 +140,7 @@ void backward(const Value& root, const Tensor* grad_seed, bool enable_parallel){
             VjpFn vjpfn = vjp_lookup(node->op);
 
             // Execute checkpointing if needed
+            std::cerr << "Processing node: " << node << " op: " << op_name(node->op) << "\n";
             if (node->is_checkpoint && node->value.numel() == 0) {
                 if (!ag::checkpoint_impl::recompute_subgraph(node->shared_from_this())) {
                     pending_tasks--;
@@ -145,7 +150,8 @@ void backward(const Value& root, const Tensor* grad_seed, bool enable_parallel){
             
             // Execute VJP function
             if (vjpfn){
-                vjpfn(node, node->grad);
+                VjpContext ctx(node, detail::to_fp32_if_float(node->grad));
+                vjpfn(ctx);
             }
 
             // Update parent counters
