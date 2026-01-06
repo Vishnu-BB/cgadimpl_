@@ -62,19 +62,11 @@ static Tensor reduce_for_broadcast(const Tensor& grad_in, const Tensor& target_v
 void vjp_Add(const VjpContext& ctx){
     Node* A = ctx.node->inputs[0].get(); 
     Node* B = ctx.node->inputs[1].get();
-    // std::cout << "vjp_Add: node=" << ctx.node << " A=" << A << " B=" << B << "\n";
-    if (A) {
-        // std::cout << "  A->value shape: " << A->value.shape().dims.size() << " numel: " << A->value.numel() << "\n";
-    }
-    if (B) {
-        // std::cout << "  B->value shape: " << B->value.shape().dims.size() << " numel: " << B->value.numel() << "\n";
-    }
-
     if (A->requires_grad()) {
-        if (A->value.numel() == 0) {
+        if (A->value.numel() == 0) {  // empty tensor 
             std::cerr << "vjp_Add: A->value is empty! A=" << A << "\n";
         }
-        A->grad += reduce_for_broadcast(ctx.gy, A->value);
+        A->grad += reduce_for_broadcast(ctx.gy, A->value);  // accumulate gradient
     }
     if (B->requires_grad()) {
         if (B->value.numel() == 0) {

@@ -196,6 +196,7 @@ if(true)
 
     add_ag_test(test_mixed_precision                  Tests/test_mixed_precision.cpp)
     add_ag_test(test_mixed_precision_mlp              Tests/test_mixed_precision_mlp.cpp)
+    add_ag_test(test_autocast_broadcast_production    Tests/test_autocast_broadcast_production.cpp)
 #nodiscard
     add_ag_test(test_nodiscard                     Tests/test_nodiscard.cpp)
     add_ag_test(test_nodiscard1                    Tests/test_nodiscard1.cpp)

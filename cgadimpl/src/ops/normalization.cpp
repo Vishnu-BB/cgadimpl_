@@ -8,8 +8,11 @@
 namespace ag {
 namespace detail {
 std::shared_ptr<Node> laynor_nodeops(const std::shared_ptr<Node>& x){
-    Tensor mean = OwnTensor::reduce_mean(x->value, {-1}, true);
-    Tensor x_minus_mean = x->value - mean;
+    Tensor X = x->value;
+    if (X.dtype() == Dtype::Bfloat16) X = X.as_type(Dtype::Float32);
+
+    Tensor mean = OwnTensor::reduce_mean(X, {-1}, true);
+    Tensor x_minus_mean = X - mean;
     Tensor variance = OwnTensor::reduce_mean(x_minus_mean * x_minus_mean, {-1}, true);
     Tensor y = x_minus_mean / OwnTensor::sqrt(variance + 1e-5f, ag::current_stream());
     auto n = std::make_shared<Node>(y, Op::LayerNorm, x->requires_grad(), "layernor");
@@ -21,10 +24,13 @@ std::shared_ptr<Node> laynor_nodeops(const std::shared_ptr<Node>& x){
     return n;
 }
 std::shared_ptr<Node> rms_nodeops(const std::shared_ptr<Node>& x){
-    Tensor x_squared = x->value * x->value;
+    Tensor X = x->value;
+    if (X.dtype() == Dtype::Bfloat16) X = X.as_type(Dtype::Float32);
+
+    Tensor x_squared = X * X;
     Tensor variance = OwnTensor::reduce_mean(x_squared, {-1}, true);
     Tensor rsqrt_var = 1.0f / OwnTensor::sqrt(variance + 1e-5f, ag::current_stream());
-    Tensor y = x->value * rsqrt_var;
+    Tensor y = X * rsqrt_var;
     auto n = std::make_shared<Node>(y, Op::RMSNorm, x->requires_grad(), "rmsnorm");
     n->tape.push_back(std::make_shared<Tensor>(rsqrt_var));
     n->tape.push_back(std::make_shared<Tensor>(y));         
@@ -34,10 +40,13 @@ std::shared_ptr<Node> rms_nodeops(const std::shared_ptr<Node>& x){
     return n;
 }
 std::shared_ptr<Node> realrms_nodeops(const std::shared_ptr<Node>& x, float& g_val){ 
-    const float inv_cols = 1.0f / static_cast<float>(x->value.shape().dims.back());
-    Tensor variance = OwnTensor::reduce_sum(x->value * x->value, {-1}, true) * inv_cols;
+    Tensor X = x->value;
+    if (X.dtype() == Dtype::Bfloat16) X = X.as_type(Dtype::Float32);
+
+    const float inv_cols = 1.0f / static_cast<float>(X.shape().dims.back());
+    Tensor variance = OwnTensor::reduce_sum(X * X, {-1}, true) * inv_cols;
     Tensor rsqrt_var = 1.0f / OwnTensor::sqrt(variance + 1e-5f, ag::current_stream());
-    Tensor y_normalized = x->value * rsqrt_var;
+    Tensor y_normalized = X * rsqrt_var;
     static std::unordered_map<float, std::shared_ptr<Node>> scalar_cache;
     std::shared_ptr<Node> G;
     auto it = scalar_cache.find(g_val);
