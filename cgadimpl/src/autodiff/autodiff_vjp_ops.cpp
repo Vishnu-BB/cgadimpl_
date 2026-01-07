@@ -400,6 +400,36 @@ void vjp_KLDivergence(const VjpContext& ctx){
     }
 }
 
+void vjp_SparseCeWithLogits(const VjpContext& ctx){
+    Node* Z_node = ctx.node->inputs[0].get();
+    // We do not compute gradients for the integer target indices (inputs[1])
+
+    if (Z_node->requires_grad()) {
+        Tensor Z = ctx.input(0);      // Logits [Batch, NumClasses]
+        Tensor Target = ctx.input(1); // Indices [Batch]
+
+        // 1. Recompute Softmax (Identical to standard CE)
+        Tensor max_val = OwnTensor::reduce_max(Z, {-1}, true);
+        Tensor z_shifted = Z - max_val;
+        Tensor exp_z = OwnTensor::exp(z_shifted, ag::current_stream());
+        Tensor sum_exp_z = OwnTensor::reduce_sum(exp_z, {-1}, true);
+        Tensor softmax_z = exp_z / sum_exp_z;
+
+        // 2. Construct One-Hot Tensor from Indices
+        // We need to subtract 1.0 from the probability of the true class.
+        // Mathematically: grad = (softmax(z) - one_hot(target))
+        int64_t num_classes = Z.shape().dims.back();
+        Tensor Y_onehot = OwnTensor::one_hot(Target, num_classes); 
+
+        // 3. Compute Gradient
+        // Scale by 1/BatchSize and incoming gradient (gy)
+        float gy_val = ctx.gy.to_cpu().data<float>()[0];
+        const float inv_batch_size = 1.0f / static_cast<float>(Z.shape().dims[0]);
+        
+        Z_node->grad += (softmax_z - Y_onehot) * (gy_val * inv_batch_size);
+    }
+}
+
 //Regression Losses --------------
 void vjp_MSELoss(const VjpContext& ctx){
     Node* Z_node = ctx.node->inputs[0].get();

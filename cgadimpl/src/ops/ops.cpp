@@ -134,7 +134,10 @@ namespace ag {
     Value kldivergence(const Value& logits, const Value& onehot){
         return Value(ag::detail::kldivergence_nodeops(logits.node, onehot.node));
     }
-
+    Value sparse_cross_entropy_with_logits(const Value& logits, const Value& target){
+        return Value(ag::detail::sparse_cross_entropy_with_logits_nodeops(logits.node, target.node));
+    }
+    
 //Regression Losses --------------
     Value mse_loss(const Value& pred, const Value& target) {
         return Value(ag::detail::mse_loss_nodeops(pred.node, target.node));

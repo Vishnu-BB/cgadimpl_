@@ -66,5 +66,21 @@ std::shared_ptr<Node> kldivergence_nodeops(const std::shared_ptr<Node>& logits, 
     return n;
 }
 
+std::shared_ptr<Node> sparse_cross_entropy_with_logits_nodeops(const std::shared_ptr<Node>& logits, const std::shared_ptr<Node>& target){
+    const Tensor& Z = logits->value;
+    const Tensor& Y = target->value;
+    Tensor max_val = OwnTensor::reduce_max(Z, {-1}, true);
+    Tensor z_shifted = Z - max_val;
+    Tensor log_sum_exp = OwnTensor::log(OwnTensor::reduce_sum(OwnTensor::exp(z_shifted, ag::current_stream()), {-1}, true), ag::current_stream());
+    Tensor log_sm_Z = z_shifted - log_sum_exp;
+    Tensor sum_kl = OwnTensor::reduce_sum(log_sm_Z, Y, -1);
+    Tensor loss = OwnTensor::reduce_mean(sum_kl);
+    auto n = std::make_shared<Node>(loss, Op::SparseCeWithLogits, (logits->requires_grad() || target->requires_grad()), "sparse_ce_with_logits");
+    n->inputs = {logits, target};
+    if (logits) logits->child_grad_count++;
+    if (target) target->child_grad_count++;
+    ag::debug::on_node_created(n);
+    return n;
+}
 } // namespace detail
 } // namespace ag

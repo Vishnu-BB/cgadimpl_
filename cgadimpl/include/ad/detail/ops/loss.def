@@ -30,6 +30,10 @@ OP(KLDivergence,  2, "kldivergence")     // KL(P || Q) divergence
                                           // Arity=2: (P, Q) distributions
                                           // Formula: sum(P * log(P/Q))
 
+OP(SparseCeWithLogits,  2, "sparse_ce_with_logits")   // Cross-entropy from raw logits
+                                          // Arity=2: (logits, one_hot_targets)
+                                          // Internally: -sum(target * log_softmax(logits))
+
 // --- Regression Losses ---
 OP(MSELoss,       2, "mseloss")          // Mean Squared Error
                                           // Formula: mean((pred - target)²)
