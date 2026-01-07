@@ -87,8 +87,6 @@ inline Value make_tensor(const Tensor& v, const char* name = "") {
 }
 static std::pmr::vector<Node*> build_topo_order_impl(Node* root, std::pmr::memory_resource* resource);
 std::vector<Node*> topo_from(Node* root);
-    
-
 inline void Value::register_hook(HookFn hook) {
     if (node) node->register_hook(hook);
 }
