@@ -306,6 +306,9 @@ Tensor jvp_CeWithLogits(Node* n, const std::function<const Tensor&(Node*)>& t){
 Tensor jvp_KLDivergence(Node* n, const std::function<const Tensor&(Node*)>& t){
     throw std::runtime_error("JVP for KLDivergence not implemented yet!");
 }
+Tensor jvp_SparseCeWithLogits(Node* n, const std::function<const Tensor&(Node*)>& t){
+    throw std::runtime_error("JVP for SparseCeWithLogits not implemented yet!");
+}
 //Regression Losses --------------
 Tensor jvp_MSELoss(Node* n, const std::function<const Tensor&(Node*)>& t){
     Node* Z_node = n->inputs[0].get(); // Predictions

@@ -415,18 +415,54 @@ void vjp_SparseCeWithLogits(const VjpContext& ctx){
         Tensor sum_exp_z = OwnTensor::reduce_sum(exp_z, {-1}, true);
         Tensor softmax_z = exp_z / sum_exp_z;
 
-        // 2. Construct One-Hot Tensor from Indices
-        // We need to subtract 1.0 from the probability of the true class.
-        // Mathematically: grad = (softmax(z) - one_hot(target))
-        int64_t num_classes = Z.shape().dims.back();
-        Tensor Y_onehot = OwnTensor::one_hot(Target, num_classes); 
-
         // 3. Compute Gradient
         // Scale by 1/BatchSize and incoming gradient (gy)
         float gy_val = ctx.gy.to_cpu().data<float>()[0];
         const float inv_batch_size = 1.0f / static_cast<float>(Z.shape().dims[0]);
+        float scale = gy_val * inv_batch_size;
         
-        Z_node->grad += (softmax_z - Y_onehot) * (gy_val * inv_batch_size);
+        // grad = (softmax - one_hot) * scale
+        //      = softmax * scale - one_hot * scale
+        
+        Z_node->grad += softmax_z * scale;
+        
+        // Subtract scale from target indices
+        if (Z.is_cpu() && Target.is_cpu()) {
+             dispatch_by_dtype(Z.dtype(), [&](auto dummy){
+                 using T = decltype(dummy);
+                 // We need to modify Z_node->grad in place.
+                 // Z_node->grad is a Tensor.
+                 // Note: Z_node->grad might be a view or shared.
+                 // But here we just added to it, so it should be valid.
+                 
+                 T* grad_ptr = Z_node->grad.data<T>();
+                 int64_t batch_size = Z.shape().dims[0];
+                 int64_t num_classes = Z.shape().dims[1];
+                 
+                 // Assume Int64 targets for now
+                 if (Target.dtype() == Dtype::Int64) {
+                     const int64_t* target_ptr = Target.data<int64_t>();
+                     for(int64_t i=0; i<batch_size; ++i) {
+                         int64_t t = target_ptr[i];
+                         if (t >= 0 && t < num_classes) {
+                             grad_ptr[i * num_classes + t] -= static_cast<T>(scale);
+                         }
+                     }
+                 } else if (Target.dtype() == Dtype::Int32) {
+                     const int32_t* target_ptr = Target.data<int32_t>();
+                     for(int64_t i=0; i<batch_size; ++i) {
+                         int32_t t = target_ptr[i];
+                         if (t >= 0 && t < num_classes) {
+                             grad_ptr[i * num_classes + t] -= static_cast<T>(scale);
+                         }
+                     }
+                 } else {
+                     throw std::runtime_error("SparseCE VJP: Targets must be Int32 or Int64");
+                 }
+             });
+        } else {
+             throw std::runtime_error("SparseCE VJP: GPU not supported yet (need kernel)");
+        }
     }
 }
 
