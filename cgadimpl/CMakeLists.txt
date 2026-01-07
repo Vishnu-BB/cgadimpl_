@@ -202,6 +202,9 @@ if(true)
     add_ag_test(test_nodiscard1                    Tests/test_nodiscard1.cpp)
 #autograd_hooks
     add_ag_test(test_hooks                  Tests/autograd_hooks_testing/test_hooks.cpp)  
+#arena
+    add_ag_test(test_bench_arena_vs_heap     Tests/test_bench_arena_vs_heap.cpp)
+    add_ag_test(test_arena                       Tests/test_arena.cpp)
 endif()
 
 message(STATUS "cgadimpl build mode: ${CMAKE_BUILD_TYPE}")

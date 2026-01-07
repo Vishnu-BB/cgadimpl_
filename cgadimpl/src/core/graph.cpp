@@ -3,6 +3,8 @@
 // =====================
 #include "ad/core/graph.hpp"
 #include "ad/runtime/cuda_graphs.hpp"
+
+#include <memory_resource>
 #include <unordered_set>
 #include <functional>
 #include <cassert>
@@ -73,18 +75,62 @@ std::pair<int, int> Value::shape_2d() const {
 // }
 
 // --- Internal implementation for graph traversal ---
-static std::vector<Node*> build_topo_order_impl(Node* root) {
-    std::vector<Node*> order; order.reserve(256);
-    std::unordered_set<Node*> vis; vis.reserve(256);
-    std::function<void(Node*)> dfs = [&](Node* n){ if(!n || vis.count(n)) return; vis.insert(n); for(auto& p : n->inputs) dfs(p.get()); order.push_back(n); };
-    dfs(root);
-    return order; // parents before child
+// static std::vector<Node*> build_topo_order_impl(Node* root) {
+//     std::vector<Node*> order; order.reserve(256);
+//     std::unordered_set<Node*> vis; vis.reserve(256);
+//     std::function<void(Node*)> dfs = [&](Node* n){ if(!n || vis.count(n)) return; vis.insert(n); for(auto& p : n->inputs) dfs(p.get()); order.push_back(n); };
+//     dfs(root);
+//     return order; // parents before child
+// }
+
+// // --- Graph Traversal ---
+// std::vector<Node*> topo_from(Node* root){
+//     return build_topo_order_impl(root);
+// }
+
+static std::pmr::vector<Node*> build_topo_order_impl(Node* root, std::pmr::memory_resource* resource) {
+ // Reserve memory from the Arena (fast bump allocation)
+ std::pmr::vector<Node*> order(resource);
+ order.reserve(256);
+ // The visited set does MANY small allocations.
+ // Doing this in an Arena is significantly faster than new/malloc.
+ std::pmr::unordered_set<Node*> vis(resource);
+ vis.reserve(256);
+
+
+
+
+ std::function<void(Node*)> dfs = [&](Node* n){
+     if(!n || vis.count(n)) return;
+     vis.insert(n); // Allocates node from Arena
+     for(auto& p : n->inputs) dfs(p.get());
+     order.push_back(n); // Allocates array resize from Arena
+ };
+ dfs(root);
+ return order;
 }
 
-// --- Graph Traversal ---
-std::vector<Node*> topo_from(Node* root){
-    return build_topo_order_impl(root);
+
+std::vector<Node*> topo_from(Node* root) {
+ // Thread-local arena persists across calls (one per thread)
+ // Initialized once per thread, then reused
+ thread_local ad::memory::Arena persistent_arena(2048 * 1024);  // 2MB
+  // Reset arena to clear previous allocations (fast - just resets pointer)
+ persistent_arena.reset();
+  // Build the order using the persistent arena
+ auto pmr_order = build_topo_order_impl(root, &persistent_arena);
+  // Copy results to standard heap vector
+ // (The graph itself lives on the heap via shared_ptr, so it's safe)
+ return std::vector<Node*>(pmr_order.begin(), pmr_order.end());
 }
 
+
+// Returns a PMR vector strictly tied to the provided arena.
+std::pmr::vector<Node*> topo_from(Node* root, ad::memory::Arena& arena) {
+ // We pass the address of your specific Arena type
+ return build_topo_order_impl(root, &arena);
+}
 
 } // namespace ag
+
+

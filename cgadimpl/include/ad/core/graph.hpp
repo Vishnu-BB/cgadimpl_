@@ -6,11 +6,13 @@
 #include <vector>
 #include <atomic>
 #include <mutex>
+#include <memory_resource>
+#include <functional>
 
 #include "tensor.hpp"
 #include "ad/core/schema.hpp"
 #include "ad/runtime/cuda_graphs.hpp"
-#include <functional>
+#include "ad/core/arena.hpp"
 
 namespace ag {
 struct Node;
@@ -83,7 +85,7 @@ struct Node : std::enable_shared_from_this<Node> {
 inline Value make_tensor(const Tensor& v, const char* name = "") {
     return Value(std::make_shared<Node>(v, Op::Leaf, v.requires_grad(), name));
 }
-
+static std::pmr::vector<Node*> build_topo_order_impl(Node* root, std::pmr::memory_resource* resource);
 std::vector<Node*> topo_from(Node* root);
     
 
