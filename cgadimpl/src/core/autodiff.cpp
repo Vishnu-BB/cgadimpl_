@@ -187,53 +187,6 @@ void backward(const Value& root, const Tensor* grad_seed, bool enable_parallel){
         worker.join();
     }
 
-
-
-    // // for (Node* n : order) {
-        
-    // //     if (n->requires_grad() /*&& n->grad.numel() == 0*/) {
-    // //         n->grad = Tensor::zeros(n->value.shape(), ag::options(n->value));
-    // //     }
-    // // }
-
-    //  // seed
-    // if (root.node->requires_grad()) {
-    //     if (grad_seed) {
-    //         root.node->grad = *grad_seed;
-    //     } else {
-    //         // Use the new factories and get options from the value tensor
-    //         auto opts = ag::options(root.node->value);
-    //         if (root.node->value.numel() == 1) {
-    //             root.node->grad.fill(1.0f);
-    //         } else {
-    //             root.node->grad = OwnTensor::Tensor::ones(root.node->value.shape(), opts);
-    //         }
-    //     }
-    // }
-
-    // // reverse topo
-    // for (auto it = order.rbegin(); it != order.rend(); ++it) {
-    //     Node* n = *it;
-    //     // The requires_grad() check is now a function call
-    //     if (!n->requires_grad()) continue;
-    //     const Tensor& gy = n->grad;
-
-    //     ag::debug::on_backprop_step(n, gy); // (optional) prints one line per node
-
-    //     if (n->is_checkpoint && n->value.numel() == 0) {
-    //     if (!ag::checkpoint_impl::recompute_subgraph(n->shared_from_this())) {
-    //         throw std::runtime_error("autodiff: failed to recompute checkpointed node during backward");
-    //     }
-    //     }
-        
-    //     // Phase 1.1: is_leaf handling
-    //     // Only compute VJP for non-leaf nodes (leaf nodes only accumulate, no backward op)
-    //     if (!n->is_leaf) {
-    //         //  this part calculates and accumulates gradients into parent nodes
-    //         VjpFn fn = vjp_lookup(n->op);
-    //         if (fn) fn(n, gy); // handler accumulates into parents
-    //     }
-    // }
 }
 
 Tensor jvp(const Value& root, const std::unordered_map<Node*, Tensor>& seed){

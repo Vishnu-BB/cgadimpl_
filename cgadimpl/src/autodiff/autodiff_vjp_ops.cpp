@@ -108,23 +108,7 @@ void vjp_Relu(const VjpContext& ctx){
     Node* X = ctx.node->inputs[0].get();
     if (X->requires_grad()) {
         Tensor x = ctx.input(0);
-        Tensor mask = OwnTensor::Tensor::zeros(x.shape(), ag::options(x));
-        if (x.is_cpu()) {
-            dispatch_by_dtype(x.dtype(), [&](auto dummy){
-                using T = decltype(dummy);
-                const T* x_ptr = x.data<T>();
-                T* m_ptr = mask.data<T>();
-                for(int64_t i=0; i<x.numel(); ++i) {
-                    if constexpr (std::is_same_v<T, OwnTensor::complex32_t> || 
-                                  std::is_same_v<T, OwnTensor::complex64_t> || 
-                                  std::is_same_v<T, OwnTensor::complex128_t>) {
-                        if (x_ptr[i].real() > 0) m_ptr[i] = T(1.0f);
-                    } else {
-                        if (x_ptr[i] > T(0)) m_ptr[i] = T(1.0f);
-                    }
-                }
-            });
-        }
+        Tensor mask = (x > 0.0f).as_type(x.dtype());
         X->grad += ctx.gy * mask;
     }
 }
@@ -193,24 +177,8 @@ void vjp_LeakyRelu(const VjpContext& ctx){
     if (X->requires_grad()) {
         float alpha = ctx.input(1).to_cpu().data<float>()[0];
         Tensor x = ctx.input(0);
-        Tensor mask = OwnTensor::Tensor::zeros(x.shape(), ag::options(x));
-        if (x.is_cpu()) {
-            dispatch_by_dtype(x.dtype(), [&](auto dummy){
-                using T = decltype(dummy);
-                const T* x_ptr = x.data<T>();
-                T* m_ptr = mask.data<T>();
-                for(int64_t i=0; i<x.numel(); ++i) {
-                    if constexpr (std::is_same_v<T, OwnTensor::complex32_t> || 
-                                  std::is_same_v<T, OwnTensor::complex64_t> || 
-                                  std::is_same_v<T, OwnTensor::complex128_t>) {
-                        m_ptr[i] = (x_ptr[i].real() > 0) ? T(1.0f) : T(alpha);
-                    } else {
-                        m_ptr[i] = (x_ptr[i] > T(0)) ? T(1.0f) : T(alpha);
-                    }
-                }
-            });
-        }
-        X->grad += ctx.gy * mask;
+        Tensor s = OwnTensor::sign(x, ag::current_stream());
+        X->grad += ctx.gy * ((0.5f + 0.5f * alpha) + s * (0.5f - 0.5f * alpha));
     }
 }
 
@@ -426,43 +394,8 @@ void vjp_SparseCeWithLogits(const VjpContext& ctx){
         
         Z_node->grad += softmax_z * scale;
         
-        // Subtract scale from target indices
-        if (Z.is_cpu() && Target.is_cpu()) {
-             dispatch_by_dtype(Z.dtype(), [&](auto dummy){
-                 using T = decltype(dummy);
-                 // We need to modify Z_node->grad in place.
-                 // Z_node->grad is a Tensor.
-                 // Note: Z_node->grad might be a view or shared.
-                 // But here we just added to it, so it should be valid.
-                 
-                 T* grad_ptr = Z_node->grad.data<T>();
-                 int64_t batch_size = Z.shape().dims[0];
-                 int64_t num_classes = Z.shape().dims[1];
-                 
-                 // Assume Int64 targets for now
-                 if (Target.dtype() == Dtype::Int64) {
-                     const int64_t* target_ptr = Target.data<int64_t>();
-                     for(int64_t i=0; i<batch_size; ++i) {
-                         int64_t t = target_ptr[i];
-                         if (t >= 0 && t < num_classes) {
-                             grad_ptr[i * num_classes + t] -= static_cast<T>(scale);
-                         }
-                     }
-                 } else if (Target.dtype() == Dtype::Int32) {
-                     const int32_t* target_ptr = Target.data<int32_t>();
-                     for(int64_t i=0; i<batch_size; ++i) {
-                         int32_t t = target_ptr[i];
-                         if (t >= 0 && t < num_classes) {
-                             grad_ptr[i * num_classes + t] -= static_cast<T>(scale);
-                         }
-                     }
-                 } else {
-                     throw std::runtime_error("SparseCE VJP: Targets must be Int32 or Int64");
-                 }
-             });
-        } else {
-             throw std::runtime_error("SparseCE VJP: GPU not supported yet (need kernel)");
-        }
+        // Subtract scale from target indices (works on both CPU and GPU)
+        OwnTensor::scatter_add(Z_node->grad, 1, Target, -scale);  //vis
     }
 }
 
