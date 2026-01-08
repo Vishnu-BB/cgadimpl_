@@ -116,8 +116,13 @@ void test_all_ops() {
     // --- Unary Ops ---
     run_test("ReLU", [&](){
         Value a = make_tensor(Tensor::randn(Shape{{4, 5}}, opts));
+        std::cerr << "  Input a:\n";
+        a.val().display(std::cerr, 4);
         auto f = [&](){ return relu(a); };
-        backward(sum(f()));
+        Value res = f();
+        std::cerr << "  ReLU(a):\n";
+        res.val().display(std::cerr, 4);
+        backward(sum(res));
         assert(check_grad(a.grad(), numerical_gradient(a, f)));
     });
     run_test("Exp", [&](){

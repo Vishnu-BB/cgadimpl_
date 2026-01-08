@@ -18,8 +18,8 @@ void run_mistaken_mlp() {
     std::cout << "Initializing Mistaken MLP..." << std::endl;
 
     // 1. Setup inputs and weights
-    Tensor x_val = Tensor::randn(Shape{{1, 10}}, TensorOptions());
-    Tensor w1_val = Tensor::randn(Shape{{10, 5}}, TensorOptions());
+    Tensor x_val = Tensor::randn(Shape{{1, 5}}, TensorOptions());
+    Tensor w1_val = Tensor::randn(Shape{{5, 5}}, TensorOptions());
     Tensor b1_val = Tensor::randn(Shape{{1, 5}}, TensorOptions());
     Tensor target_val = Tensor::randn(Shape{{1, 5}}, TensorOptions());
 

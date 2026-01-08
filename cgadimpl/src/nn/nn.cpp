@@ -1,45 +1,50 @@
 #include "nn/nn.hpp"
 #include <cmath>
-#include <cassert>
-#include "tensor.hpp" 
 
 namespace ag::nn {
 
 void Module::to(Device dev) {
-    for (Value& p : params_) {
-        if (p.node) {
+    for (auto& p : params_) {
+        if (p.node && p.node->value.device() != dev) {
             p.node->value = p.node->value.to(dev);
-            p.node->grad = OwnTensor::Tensor::zeros(p.node->value.shape(), ag::options(p.node->value));
+            if (p.node->grad.is_valid()) {
+                p.node->grad = p.node->grad.to(dev);
+            }
         }
     }
 }
 
 void Module::zero_grad() {
-    for (Value& p : params_) {
-        if (p.node && p.node->requires_grad()) {
-            p.node->grad = OwnTensor::Tensor::zeros(p.node->value.shape(), ag::options(p.node->value));
+    for (auto& p : params_) {
+        if (p.node && p.node->grad.is_valid()) {
+            p.node->grad = Tensor::zeros(p.node->grad.shape(), 
+                TensorOptions().with_dtype(p.node->grad.dtype()).with_device(p.node->grad.device()));
         }
     }
 }
 
 Linear::Linear(int in_features, int out_features, Device dev) {
-    float scale = sqrtf(2.0f / in_features);
-    auto param_opts = OwnTensor::TensorOptions().with_device(dev).with_req_grad(true);
-    Tensor w_tensor = OwnTensor::Tensor::randn(Shape{{out_features, in_features}}, param_opts) * scale;
-    Tensor b_tensor = OwnTensor::Tensor::zeros(Shape{{1, out_features}}, param_opts);
-    W = make_tensor(w_tensor, "W");
-    b = make_tensor(b_tensor, "b");
+    float k = 1.0f / std::sqrt((float)in_features);
+    
+    Tensor Wt = Tensor::randn(Shape{{in_features, out_features}}, 
+        TensorOptions().with_device(dev).with_req_grad(true)) * k;
+    Tensor bt = Tensor::zeros(Shape{{1, out_features}}, 
+        TensorOptions().with_device(dev).with_req_grad(true));
+    
+    W = make_tensor(Wt, "linear_W");
+    b = make_tensor(bt, "linear_b");
+    
     params_.push_back(W);
     params_.push_back(b);
 }
 
-Value Linear::operator()(Value input) {   
-    return linear(input, W, b);
+Value Linear::operator()(Value input) {
+    return matmul(input, W) + b;
 }
 
 Sequential::Sequential(const std::vector<Module*>& modules) : layers_(modules) {
-    for (auto* mod : layers_) {
-        for(auto& p : mod->parameters()) {
+    for (auto* m : layers_) {
+        for (auto& p : m->parameters()) {
             params_.push_back(p);
         }
     }
@@ -53,7 +58,7 @@ Value Sequential::operator()(Value x) {
 }
 
 Value ReLU::operator()(Value input) {
-    return ag::relu(input);
+    return relu(input);
 }
 
 } // namespace ag::nn

@@ -57,7 +57,7 @@ int main() {
     Value L3 = leaky_relu(matmul(L2, W3) + b3, 0.1f);
     Value L4 = softplus(matmul(L3, W4) + b4);
     Value logits = matmul(L4, W5) + b5;
-    Value loss = sparse_cross_entropy_with_logits(logits, Y);
+    Value loss = cross_entropy_with_logits(logits, Y);
 
     // ---------- Backprop ----------
     zero_grad(loss);
