@@ -252,18 +252,22 @@ Tensor jvp(const Value& root, const std::unordered_map<Node*, Tensor>& seed){
     };
 
     for (Node* n : order) {
-        // seed tangent for this node (if provided), else zeros of the correct shape/device
-        Tensor t = OwnTensor::Tensor::zeros(n->value.shape(), ag::options(n->value));
-        if (auto it = seed.find(n); it != seed.end()) {
+        Tensor t;
+        auto it = seed.find(n);
+        if (it != seed.end()) {
             t = it->second;
+        } else if (n->op == Op::Leaf) {
+            t = OwnTensor::Tensor::zeros(n->value.shape(), ag::options(n->value));
+        } else {
+            JvpFn fn = jvp_lookup(n->op);
+            if (fn) {
+                t = fn(n, tangent_of);
+            } else {
+                t = OwnTensor::Tensor::zeros(n->value.shape(), ag::options(n->value));
+            }
         }
 
         ag::debug::on_jvp_step(n);
-
-        //  this part calculates and accumulates gradients
-        JvpFn fn = jvp_lookup(n->op);
-        if (fn) t = fn(n, tangent_of);
-
         T[n] = t;
     }
     return T[root.node.get()];
