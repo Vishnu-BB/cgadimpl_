@@ -212,7 +212,10 @@ if(true)
     add_ag_test(test_arena                       Tests/test_arena.cpp)
     add_ag_test(test_csv_loader                  Tests/test_csv_loader.cpp)
     add_executable(cgadimpl_model ../Comparsion/linear_regression/cgadimpl_model.cpp)
+    add_executable(own_regresion ../Comparsion/linear_regression/own_regresion.cpp)
     target_link_libraries(cgadimpl_model PRIVATE cgadimpl::cgadimpl CUDA::cudart OpenMP::OpenMP_CXX)
+    target_link_libraries(own_regresion PRIVATE cgadimpl::cgadimpl CUDA::cudart OpenMP::OpenMP_CXX)
+
 endif()
 
 message(STATUS "cgadimpl build mode: ${CMAKE_BUILD_TYPE}")
