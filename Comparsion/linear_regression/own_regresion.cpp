@@ -10,20 +10,32 @@ int main() {
     std::vector<float> X_data;
     std::vector<float> Y_data;
     std::string line;
-    std::ifstream file("/home/blu-bridge016/Downloads/test_env_gau/benchmark_results/inputs/Salary_dataset.csv");
+    std::string dataset_path = "/home/blubridge-029/Downloads/cgad/cgadimpl_/Comparsion/linear_regression/Salary_dataset.csv";
+    std::ifstream file(dataset_path);
+    
+    if (!file.is_open()) {
+        std::cerr << "Error: Could not open file " << dataset_path << std::endl;
+        return 1;
+    }
+
     std::getline(file, line); // Skip header
 
     while(std::getline(file, line)) {
         std::stringstream ss(line);
         std::string cell;
-        std::getline(ss, cell, ',');  // Index - ignore
-        std::getline(ss, cell, ',');  // YearsExperience
+        if (!std::getline(ss, cell, ',')) continue;  // Index - ignore
+        if (!std::getline(ss, cell, ',')) continue;  // YearsExperience
         X_data.push_back(std::stof(cell));
-        std::getline(ss, cell, ','); // Salary
+        if (!std::getline(ss, cell, ',')) continue; // Salary
         Y_data.push_back(std::stof(cell));
     }
     
     size_t n = X_data.size();
+    if (n == 0) {
+        std::cerr << "Error: No data loaded from " << dataset_path << std::endl;
+        return 1;
+    }
+
     auto opts = OwnTensor::TensorOptions().with_device(OwnTensor::Device::CUDA).with_dtype(OwnTensor::Dtype::Float32);
 
     // Create tensors
