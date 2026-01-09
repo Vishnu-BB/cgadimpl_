@@ -11,7 +11,7 @@ using namespace OwnTensor;
 void print_section(const std::string& name) {
     std::cout << "\n========================================\n";
     std::cout << name << "\n";
-    std::cout << "========================================\n";
+    // std::cout << "========================================\n";
 }
 
 // Helper to check if gradients are valid (no NaN, no Inf)
@@ -50,6 +50,8 @@ bool test_single_class() {
     
     Value loss = sparse_cross_entropy_with_logits(Z, Y);
     backward(loss);
+    ag::debug::print_all_values(loss);
+    ag::debug::print_all_grads(loss);
     
     // With single class, softmax is always 1.0, so loss should be 0
     float actual_loss = loss.val().data<float>()[0];
@@ -92,6 +94,8 @@ bool test_many_classes() {
     
     Value loss = sparse_cross_entropy_with_logits(Z, Y);
     backward(loss);
+    ag::debug::print_all_values(loss);
+    ag::debug::print_all_grads(loss);
     
     if (!check_gradients_valid(Z)) return false;
     
@@ -146,7 +150,9 @@ bool test_extreme_logits() {
     
     Value loss = sparse_cross_entropy_with_logits(Z, Y);
     backward(loss);
-    
+    ag::debug::print_all_values(loss);
+    ag::debug::print_all_grads(loss);
+
     float actual_loss = loss.val().data<float>()[0];
     std::cout << "Loss: " << actual_loss << "\n";
     
@@ -182,7 +188,9 @@ bool test_large_batch() {
     
     Value loss = sparse_cross_entropy_with_logits(Z, Y);
     backward(loss);
-    
+    ag::debug::print_all_values(loss);
+    ag::debug::print_all_grads(loss);
+
     if (!check_gradients_valid(Z)) return false;
     
     std::cout << "Loss: " << loss.val().data<float>()[0] << "\n";
@@ -213,7 +221,9 @@ bool test_same_target_class() {
     
     Value loss = sparse_cross_entropy_with_logits(Z, Y);
     backward(loss);
-    
+    ag::debug::print_all_values(loss);
+    ag::debug::print_all_grads(loss);
+
     if (!check_gradients_valid(Z)) return false;
     
     std::cout << "Loss: " << loss.val().data<float>()[0] << "\n";
@@ -243,7 +253,9 @@ bool test_gradient_accumulation() {
     // First backward
     Value loss1 = sparse_cross_entropy_with_logits(Z, Y);
     backward(loss1);
-    
+    ag::debug::print_all_values(loss1);
+    ag::debug::print_all_grads(loss1);
+
     float* g_ptr = Z.grad().data<float>();
     float first_grad = g_ptr[0];
     

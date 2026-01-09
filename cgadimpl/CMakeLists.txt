@@ -210,6 +210,9 @@ if(true)
 #arena
     add_ag_test(test_bench_arena_vs_heap     Tests/test_bench_arena_vs_heap.cpp)
     add_ag_test(test_arena                       Tests/test_arena.cpp)
+    add_ag_test(test_csv_loader                  Tests/test_csv_loader.cpp)
+    add_executable(cgadimpl_model ../Comparsion/linear_regression/cgadimpl_model.cpp)
+    target_link_libraries(cgadimpl_model PRIVATE cgadimpl::cgadimpl CUDA::cudart OpenMP::OpenMP_CXX)
 endif()
 
 message(STATUS "cgadimpl build mode: ${CMAKE_BUILD_TYPE}")
